@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 const routes = [
   { href: "/dashboard", label: "Overview", icon: "overview" },
   { href: "/proyectos", label: "Proyectos", icon: "projects" },
+  { href: "/ideas", label: "Ideas", icon: "ideas" },
   { href: "/cronograma", label: "Cronograma", icon: "calendar" },
   { href: "/finanzas", label: "Finanzas", icon: "finance" },
   { href: "/costos", label: "Costos", icon: "costs" },
@@ -20,6 +21,7 @@ const routes = [
 const routeMeta = [
   { match: "/dashboard", eyebrow: "Vista general" },
   { match: "/proyectos", eyebrow: "Portfolio de proyectos" },
+  { match: "/ideas", eyebrow: "Notas e ideas" },
   { match: "/cronograma", eyebrow: "Cronograma maestro" },
   { match: "/finanzas", eyebrow: "Control financiero" },
   { match: "/costos", eyebrow: "Infraestructura y stack" },
