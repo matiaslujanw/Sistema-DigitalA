@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { clients, costs, events, projectPayments, projects } from "@/lib/mock-data";
+import { getAppData } from "@/lib/data";
 import { money } from "@/lib/format";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const { clients, costs, events, payments: projectPayments, projects, source } = await getAppData();
   const totalSold = projects.filter((project) => project.currency === "ARS").reduce((sum, project) => sum + project.salePrice, 0);
   const totalPaid = projectPayments.filter((payment) => payment.currency === "ARS").reduce((sum, payment) => sum + payment.amount, 0);
   const pending = Math.max(0, totalSold - totalPaid);
@@ -18,7 +19,7 @@ export default function DashboardPage() {
         <div className="alert-mark">!</div>
         <div>
           <strong>Decisiones financieras pendientes</strong>
-          <span>Requiere aprobacion de distribucion para Q3 y ajuste de presupuesto en proyectos activos.</span>
+          <span>Requiere aprobacion de distribucion para Q3 y ajuste de presupuesto en proyectos activos. Fuente: {source === "supabase" ? "Supabase" : "Mock"}</span>
         </div>
         <Link href="/finanzas">Revisar ahora</Link>
       </article>

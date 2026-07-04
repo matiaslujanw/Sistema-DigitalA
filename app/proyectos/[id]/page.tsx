@@ -1,22 +1,19 @@
 import { ProjectDetailLoader } from "@/components/project-detail-loader";
-import { clients, events, projectPayments, projects } from "@/lib/mock-data";
-
-export function generateStaticParams() {
-  return projects.map((project) => ({ id: project.id }));
-}
+import { getProjectDetail } from "@/lib/data";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const project = projects.find((item) => item.id === id);
-  const client = project ? clients.find((item) => item.id === project.clientId) ?? null : null;
+  const detail = await getProjectDetail(id);
 
   return (
     <ProjectDetailLoader
-      initialClient={client}
-      initialEvents={project ? events.filter((event) => event.projectId === project.id) : []}
-      initialPayments={project ? projectPayments.filter((payment) => payment.projectId === project.id) : []}
-      initialProject={project ?? null}
+      initialClient={detail.client}
+      initialEvents={detail.events}
+      initialNotes={detail.notes}
+      initialPayments={detail.payments}
+      initialProject={detail.project}
       projectId={id}
+      source={detail.source}
     />
   );
 }

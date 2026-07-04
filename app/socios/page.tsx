@@ -1,7 +1,9 @@
 import { PageHeader } from "@/components/ui";
-import { events, partnerProfiles, projects } from "@/lib/mock-data";
+import { getAppData } from "@/lib/data";
 
-export default function PartnersPage() {
+export default async function PartnersPage() {
+  const data = await getAppData();
+
   return (
     <>
       <PageHeader
@@ -12,9 +14,9 @@ export default function PartnersPage() {
       />
 
       <section className="people-grid">
-        {partnerProfiles.map((partner) => {
-          const assignedProjects = projects.filter((project) => project.partners.includes(partner.name));
-          const trackedHours = events.filter((event) => event.owner === partner.name).reduce((sum, event) => sum + event.hours, 0);
+        {data.partnerProfiles.map((partner) => {
+          const assignedProjects = data.projects.filter((project) => project.partners.includes(partner.name));
+          const trackedHours = data.events.filter((event) => event.owner === partner.name).reduce((sum, event) => sum + event.hours, 0);
 
           return (
             <article className="person-card" key={partner.id}>

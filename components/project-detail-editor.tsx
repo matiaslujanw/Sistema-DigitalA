@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { addProjectNoteAction, addProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
 import type { Client, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
 import { projectStatuses } from "@/lib/project-statuses";
 import { dateLabel, daysBetween, money } from "@/lib/format";
@@ -20,16 +22,20 @@ export function ProjectDetailEditor({
   events,
   initialNotes,
   initialProject,
-  initialPayments
+  initialPayments,
+  source
 }: {
   client: Client;
   events: ProjectEvent[];
   initialNotes: ProjectNote[];
   initialProject: Project;
   initialPayments: ProjectPayment[];
+  source: "mock" | "supabase";
 }) {
-  const storageKey = `da-project-${initialProject.id}`;
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [project, setProject] = useState<EditableProject>({ ...initialProject, notes: initialNotes, payments: initialPayments });
+  const [feedback, setFeedback] = useState(source === "supabase" ? "Conectado a Supabase" : "Fallback mock: corre el SQL y seed para persistir");
   const [paymentDraft, setPaymentDraft] = useState({
     amount: "",
     currency: initialProject.currency,
@@ -46,23 +52,6 @@ export function ProjectDetailEditor({
     type: "Relevamiento" as ProjectNote["type"]
   });
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved) {
-      const parsed = JSON.parse(saved) as Partial<EditableProject>;
-      setProject({
-        ...initialProject,
-        ...parsed,
-        notes: parsed.notes ?? initialNotes,
-        payments: parsed.payments ?? initialPayments
-      });
-    }
-  }, [initialNotes, initialPayments, initialProject, storageKey]);
-
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(project));
-  }, [project, storageKey]);
-
   const paidAmount = useMemo(
     () => project.payments.filter((payment) => payment.currency === project.currency).reduce((sum, payment) => sum + payment.amount, 0),
     [project.currency, project.payments]
@@ -76,6 +65,28 @@ export function ProjectDetailEditor({
 
   function updateProject<T extends keyof EditableProject>(key: T, value: EditableProject[T]) {
     setProject((current) => ({ ...current, [key]: value }));
+  }
+
+  function saveProjectChanges() {
+    if (source !== "supabase") return;
+
+    startTransition(async () => {
+      try {
+        await updateProjectAction(project.id, {
+          contractDate: project.contractDate,
+          contractSigned: project.contractSigned,
+          currency: project.currency,
+          nextMilestone: project.nextMilestone,
+          paymentMethod: project.paymentMethod,
+          salePrice: project.salePrice,
+          status: project.status
+        });
+        setFeedback("Cambios guardados en Supabase");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo guardar el proyecto");
+      }
+    });
   }
 
   function addPayment() {
@@ -92,8 +103,30 @@ export function ProjectDetailEditor({
       note: paymentDraft.note || "Pago cargado manualmente"
     };
 
-    setProject((current) => ({ ...current, payments: [payment, ...current.payments] }));
-    setPaymentDraft((current) => ({ ...current, amount: "", note: "" }));
+    if (source !== "supabase") {
+      setProject((current) => ({ ...current, payments: [payment, ...current.payments] }));
+      setPaymentDraft((current) => ({ ...current, amount: "", note: "" }));
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await addProjectPaymentAction({
+          amount,
+          currency: paymentDraft.currency,
+          date: paymentDraft.date,
+          method: paymentDraft.method,
+          note: payment.note,
+          projectId: project.id
+        });
+        setProject((current) => ({ ...current, payments: [payment, ...current.payments] }));
+        setPaymentDraft((current) => ({ ...current, amount: "", note: "" }));
+        setFeedback("Pago guardado en Supabase");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo guardar el pago");
+      }
+    });
   }
 
   function addNote() {
@@ -110,13 +143,31 @@ export function ProjectDetailEditor({
       type: noteDraft.type
     };
 
-    setProject((current) => ({ ...current, notes: [note, ...current.notes] }));
-    setNoteDraft((current) => ({ ...current, body: "", createsTask: false, title: "" }));
-  }
+    if (source !== "supabase") {
+      setProject((current) => ({ ...current, notes: [note, ...current.notes] }));
+      setNoteDraft((current) => ({ ...current, body: "", createsTask: false, title: "" }));
+      return;
+    }
 
-  function resetLocalChanges() {
-    window.localStorage.removeItem(storageKey);
-    setProject({ ...initialProject, notes: initialNotes, payments: initialPayments });
+    startTransition(async () => {
+      try {
+        await addProjectNoteAction({
+          body: note.body,
+          createsTask: note.createsTask,
+          date: note.date,
+          owner: note.owner,
+          projectId: project.id,
+          title: note.title,
+          type: note.type
+        });
+        setProject((current) => ({ ...current, notes: [note, ...current.notes] }));
+        setNoteDraft((current) => ({ ...current, body: "", createsTask: false, title: "" }));
+        setFeedback("Nota guardada en Supabase");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo guardar la nota");
+      }
+    });
   }
 
   return (
@@ -132,14 +183,17 @@ export function ProjectDetailEditor({
             <span>{elapsedDays} dias trazados</span>
           </div>
         </div>
-        <button className="ghost-button" type="button" onClick={resetLocalChanges}>Reset local</button>
+        <button className="ghost-button" disabled={isPending || source !== "supabase"} type="button" onClick={saveProjectChanges}>
+          {isPending ? "Guardando" : "Guardar cambios"}
+        </button>
       </header>
+      <p className="detail-feedback">{feedback}</p>
 
       <section className="detail-grid">
         <article className="panel-block edit-panel">
           <div className="block-heading">
             <span className="eyebrow">Estado y contrato</span>
-            <span>Editable local</span>
+            <span>{source === "supabase" ? "Editable Supabase" : "Mock"}</span>
           </div>
 
           <label className="field">
@@ -256,7 +310,7 @@ export function ProjectDetailEditor({
               value={paymentDraft.note}
               onChange={(event) => setPaymentDraft((current) => ({ ...current, note: event.target.value }))}
             />
-            <button type="button" onClick={addPayment}>Agregar pago</button>
+            <button disabled={isPending} type="button" onClick={addPayment}>Agregar pago</button>
           </div>
 
           <div className="data-list">
@@ -333,7 +387,7 @@ export function ProjectDetailEditor({
               <span>Texto del relevamiento</span>
               <textarea value={noteDraft.body} onChange={(event) => setNoteDraft((current) => ({ ...current, body: event.target.value }))} />
             </label>
-            <button className="command-button note-submit" type="button" onClick={addNote}>Agregar nota</button>
+            <button className="command-button note-submit" disabled={isPending} type="button" onClick={addNote}>Agregar nota</button>
           </div>
 
           <div className="notes-list">

@@ -41,6 +41,7 @@ Digital Amenities es una empresa de desarrollo de software formada por tres soci
 - La ruta `/cronograma` muestra proyectos en un selector lateral y al elegir uno despliega su linea de tiempo vertical con eventos, responsables, horas y resumen de salud
 - Todavia no hay persistencia real en Supabase
 - El flujo actual sigue siendo localStorage, no multiusuario ni persistente entre navegadores
+- Paso en curso: pasar Supabase a fuente de verdad. El archivo `supabase/schema.sql` crea las tablas y `npm run seed:supabase` migra la mock data inicial.
 
 ## Backlog funcional para retomar con base de datos
 

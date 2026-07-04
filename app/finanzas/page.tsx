@@ -1,12 +1,13 @@
 import { PageHeader } from "@/components/ui";
 import { FinanceWorkspace } from "@/components/finance-workspace";
-import { cashMovements, projects } from "@/lib/mock-data";
+import { getAppData } from "@/lib/data";
 import { getOverviewMetrics } from "@/lib/metrics";
 import { money } from "@/lib/format";
 
-export default function FinancePage() {
-  const metrics = getOverviewMetrics();
-  const projectNames = Object.fromEntries(projects.map((project) => [project.id, project.name]));
+export default async function FinancePage() {
+  const data = await getAppData();
+  const metrics = getOverviewMetrics(data);
+  const projectNames = Object.fromEntries(data.projects.map((project) => [project.id, project.name]));
 
   return (
     <>
@@ -32,7 +33,7 @@ export default function FinancePage() {
         </article>
       </section>
 
-      <FinanceWorkspace initialMovements={cashMovements} projectNames={projectNames} />
+      <FinanceWorkspace initialMovements={data.cashMovements} projectNames={projectNames} source={data.source} />
     </>
   );
 }

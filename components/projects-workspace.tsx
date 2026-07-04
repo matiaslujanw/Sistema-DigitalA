@@ -2,35 +2,25 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { PageHeader, StatusPill } from "@/components/ui";
-import { clients, events, projectPayments, projects } from "@/lib/mock-data";
 import { dateLabel, daysBetween, money } from "@/lib/format";
-import { localKeys } from "@/lib/local-keys";
 import type { Client, Project, ProjectEvent, ProjectPayment } from "@/lib/types";
 
-type StoredProject = Project & { payments?: ProjectPayment[] };
-
-export function ProjectsWorkspace() {
-  const [localProjects, setLocalProjects] = useState<Project[]>([]);
-  const [localClients, setLocalClients] = useState<Client[]>([]);
-  const [localEvents, setLocalEvents] = useState<ProjectEvent[]>([]);
-
-  useEffect(() => {
-    setLocalProjects(readLocal<Project[]>(localKeys.projects, []));
-    setLocalClients(readLocal<Client[]>(localKeys.clients, []));
-    setLocalEvents(readLocal<ProjectEvent[]>(localKeys.events, []));
-  }, []);
-
-  const allClients = useMemo(() => [...clients, ...localClients], [localClients]);
-  const allProjects = useMemo(() => {
-    const merged = [...projects, ...localProjects];
-    return merged.map((project) => {
-      const saved = readLocal<StoredProject | null>(`da-project-${project.id}`, null);
-      return saved ? { ...project, ...saved } : project;
-    });
-  }, [localProjects]);
-  const allEvents = useMemo(() => [...events, ...localEvents].sort((a, b) => b.date.localeCompare(a.date)), [localEvents]);
+export function ProjectsWorkspace({
+  clients,
+  events,
+  payments,
+  projects,
+  source
+}: {
+  clients: Client[];
+  events: ProjectEvent[];
+  payments: ProjectPayment[];
+  projects: Project[];
+  source: "mock" | "supabase";
+}) {
+  const allEvents = useMemo(() => [...events].sort((a, b) => b.date.localeCompare(a.date)), [events]);
 
   return (
     <>
@@ -46,15 +36,13 @@ export function ProjectsWorkspace() {
         <div className="panel-block projects-board">
           <div className="block-heading">
             <span className="eyebrow">Pipeline comercial</span>
-            <span>{allProjects.length} proyectos</span>
+            <span>{projects.length} proyectos · {source === "supabase" ? "Supabase" : "Mock"}</span>
           </div>
           <div className="project-list">
-            {allProjects.map((project) => {
-              const client = allClients.find((item) => item.id === project.clientId);
-              const saved = readLocal<StoredProject | null>(`da-project-${project.id}`, null);
-              const savedPayments = saved?.payments ?? [];
-              const payments = savedPayments.length > 0 ? savedPayments : projectPayments.filter((payment) => payment.projectId === project.id);
-              const paidAmount = payments
+            {projects.map((project) => {
+              const client = clients.find((item) => item.id === project.clientId);
+              const projectPayments = payments.filter((payment) => payment.projectId === project.id);
+              const paidAmount = projectPayments
                 .filter((payment) => payment.currency === project.currency)
                 .reduce((sum, payment) => sum + payment.amount, 0);
               const paidPercent = project.salePrice > 0 ? Math.round((paidAmount / project.salePrice) * 100) : 0;
@@ -91,7 +79,7 @@ export function ProjectsWorkspace() {
           </div>
           <div className="event-stack">
             {allEvents.map((event) => {
-              const project = allProjects.find((item) => item.id === event.projectId);
+              const project = projects.find((item) => item.id === event.projectId);
               const previousEvent = allEvents
                 .filter((item) => item.projectId === event.projectId && item.date < event.date)
                 .sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -114,13 +102,4 @@ export function ProjectsWorkspace() {
       </section>
     </>
   );
-}
-
-function readLocal<T>(key: string, fallback: T): T {
-  try {
-    const value = window.localStorage.getItem(key);
-    return value ? (JSON.parse(value) as T) : fallback;
-  } catch {
-    return fallback;
-  }
 }

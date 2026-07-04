@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { clients, events, projects } from "@/lib/mock-data";
 import { dateLabel } from "@/lib/format";
+import type { Client, Project, ProjectEvent } from "@/lib/types";
 
 const fallbackEvents = [
   {
@@ -39,7 +39,15 @@ const fallbackEvents = [
   }
 ];
 
-export function CronogramaWorkspace() {
+export function CronogramaWorkspace({
+  clients,
+  events,
+  projects
+}: {
+  clients: Client[];
+  events: ProjectEvent[];
+  projects: Project[];
+}) {
   const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id ?? "");
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0];
   const selectedClient = selectedProject ? clients.find((client) => client.id === selectedProject.clientId) : null;
@@ -54,7 +62,7 @@ export function CronogramaWorkspace() {
       .sort((a, b) => b.date.localeCompare(a.date));
 
     return projectEvents.length > 0 ? projectEvents : fallbackEvents.map((event, index) => ({ ...event, id: `fallback-${index}`, projectId: selectedProjectKey }));
-  }, [selectedProjectKey]);
+  }, [events, selectedProjectKey]);
 
   if (!selectedProject) {
     return null;

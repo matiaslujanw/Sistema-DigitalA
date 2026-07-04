@@ -1,17 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { createProjectAction } from "@/app/actions/projects";
 import { PageHeader } from "@/components/ui";
-import { partners } from "@/lib/mock-data";
-import { localKeys } from "@/lib/local-keys";
 import { projectStatuses } from "@/lib/project-statuses";
-import type { Client, PaymentMethod, Project, ProjectStatus } from "@/lib/types";
+import type { PaymentMethod, ProjectStatus } from "@/lib/types";
 
 const paymentMethods: PaymentMethod[] = ["Transferencia", "Efectivo", "USD", "Cheque", "Mixto"];
 
 export function NewProjectForm() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState("Se guarda en Supabase si las tablas ya estan creadas.");
   const [draft, setDraft] = useState({
     clientContact: "",
     clientIndustry: "",
@@ -30,35 +31,29 @@ export function NewProjectForm() {
   function createProject() {
     if (!draft.name.trim() || !draft.clientName.trim()) return;
 
-    const clientId = `local-client-${Date.now()}`;
-    const projectId = `local-project-${Date.now()}`;
-    const client: Client = {
-      id: clientId,
-      contact: draft.clientContact || "Sin contacto",
-      industry: draft.clientIndustry || "Sin rubro",
-      name: draft.clientName
-    };
-    const project: Project = {
-      id: projectId,
-      clientId,
-      contractDate: draft.contractSigned ? draft.startDate : null,
-      contractSigned: draft.contractSigned,
-      currency: draft.currency,
-      marginTarget: Number(draft.marginTarget) || 0,
-      name: draft.name,
-      nextMilestone: draft.nextMilestone,
-      paidAmount: 0,
-      partners,
-      paymentMethod: draft.paymentMethod,
-      salePrice: Number(draft.salePrice) || 0,
-      startDate: draft.startDate,
-      status: draft.status
-    };
+    startTransition(async () => {
+      try {
+        const projectId = await createProjectAction({
+          clientContact: draft.clientContact,
+          clientIndustry: draft.clientIndustry,
+          clientName: draft.clientName,
+          contractSigned: draft.contractSigned,
+          currency: draft.currency,
+          marginTarget: Number(draft.marginTarget) || 0,
+          name: draft.name,
+          nextMilestone: draft.nextMilestone,
+          paymentMethod: draft.paymentMethod,
+          salePrice: Number(draft.salePrice) || 0,
+          startDate: draft.startDate,
+          status: draft.status
+        });
 
-    writeList(localKeys.clients, client);
-    writeList(localKeys.projects, project);
-    window.localStorage.setItem(`da-project-${projectId}`, JSON.stringify({ ...project, notes: [], payments: [] }));
-    router.push(`/proyectos/${projectId}`);
+        router.push(`/proyectos/${projectId}`);
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo crear el proyecto");
+      }
+    });
   }
 
   return (
@@ -66,13 +61,13 @@ export function NewProjectForm() {
       <PageHeader
         eyebrow="Nuevo proyecto"
         title="Crear una base simple y completarla de a poco."
-        description="Este flujo queda guardado en el navegador hasta que conectemos Supabase."
+        description="Este flujo crea cliente y proyecto en Supabase para continuar editandolo desde el detalle."
       />
 
       <section className="panel-block form-shell">
         <div className="block-heading">
           <span className="eyebrow">Datos iniciales</span>
-          <span>LocalStorage</span>
+          <span>Supabase</span>
         </div>
 
         <div className="field-grid form-grid-wide">
@@ -137,22 +132,11 @@ export function NewProjectForm() {
           </label>
         </div>
 
-        <button className="command-button form-submit" type="button" onClick={createProject}>Crear proyecto</button>
+        <p className="form-feedback">{feedback}</p>
+        <button className="command-button form-submit" disabled={isPending} type="button" onClick={createProject}>
+          {isPending ? "Creando" : "Crear proyecto"}
+        </button>
       </section>
     </>
   );
-}
-
-function writeList<T extends { id: string }>(key: string, item: T) {
-  const current = readList<T>(key);
-  window.localStorage.setItem(key, JSON.stringify([item, ...current.filter((currentItem) => currentItem.id !== item.id)]));
-}
-
-function readList<T>(key: string): T[] {
-  try {
-    const value = window.localStorage.getItem(key);
-    return value ? (JSON.parse(value) as T[]) : [];
-  } catch {
-    return [];
-  }
 }

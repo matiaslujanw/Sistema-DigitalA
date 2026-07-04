@@ -1,8 +1,27 @@
-create type project_status as enum ('Relevamiento', 'En desarrollo', 'MVP armado', 'MVP entregado', 'Correcciones', 'Implementacion', 'En uso');
-create type payment_method as enum ('Transferencia', 'Efectivo', 'USD', 'Cheque', 'Mixto');
-create type cash_destination as enum ('Reparto socios', 'Plazo fijo', 'Dolares', 'Cheques', 'Reinversion', 'Caja');
+create extension if not exists pgcrypto;
 
-create table public.clients (
+do $$
+begin
+  create type project_status as enum ('Relevamiento', 'En desarrollo', 'MVP armado', 'MVP entregado', 'Correcciones', 'Implementacion', 'En uso');
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  create type payment_method as enum ('Transferencia', 'Efectivo', 'USD', 'Cheque', 'Mixto');
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  create type cash_destination as enum ('Reparto socios', 'Plazo fijo', 'Dolares', 'Cheques', 'Reinversion', 'Caja');
+exception
+  when duplicate_object then null;
+end $$;
+
+create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   contact text,
@@ -10,7 +29,18 @@ create table public.clients (
   created_at timestamptz not null default now()
 );
 
-create table public.projects (
+create table if not exists public.partners (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text,
+  role text not null default 'Socio',
+  focus text not null default 'Operacion y delivery',
+  allocation integer not null default 0 check (allocation >= 0 and allocation <= 100),
+  status text not null default 'Activo' check (status in ('Activo', 'Pausado')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.projects (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.clients(id) on delete restrict,
   name text not null,
@@ -22,12 +52,12 @@ create table public.projects (
   contract_signed boolean not null default false,
   contract_date date,
   start_date date not null default current_date,
-  next_milestone text,
+  next_milestone text not null default 'Definir proximo hito',
   margin_target numeric(5, 2) not null default 0,
   created_at timestamptz not null default now()
 );
 
-create table public.project_payments (
+create table if not exists public.project_payments (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   happened_on date not null,
@@ -38,21 +68,14 @@ create table public.project_payments (
   created_at timestamptz not null default now()
 );
 
-create table public.partners (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  email text,
-  created_at timestamptz not null default now()
-);
-
-create table public.project_partners (
+create table if not exists public.project_partners (
   project_id uuid not null references public.projects(id) on delete cascade,
   partner_id uuid not null references public.partners(id) on delete cascade,
   role text,
   primary key (project_id, partner_id)
 );
 
-create table public.project_events (
+create table if not exists public.project_events (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   type text not null check (type in ('Reunion', 'Entrega', 'Feature', 'Implementacion', 'Decision', 'Relevamiento', 'Nota', 'Pedido cliente', 'Bloqueo', 'Cambio de alcance')),
@@ -64,7 +87,7 @@ create table public.project_events (
   created_at timestamptz not null default now()
 );
 
-create table public.project_notes (
+create table if not exists public.project_notes (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   happened_on date not null,
@@ -76,7 +99,7 @@ create table public.project_notes (
   created_at timestamptz not null default now()
 );
 
-create table public.costs (
+create table if not exists public.costs (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references public.projects(id) on delete set null,
   name text not null,
@@ -88,7 +111,7 @@ create table public.costs (
   created_at timestamptz not null default now()
 );
 
-create table public.cash_movements (
+create table if not exists public.cash_movements (
   id uuid primary key default gen_random_uuid(),
   source_project_id uuid references public.projects(id) on delete set null,
   happened_on date not null,
@@ -105,6 +128,14 @@ create table public.cash_movements (
   notes text,
   created_at timestamptz not null default now()
 );
+
+create index if not exists projects_client_id_idx on public.projects(client_id);
+create index if not exists project_payments_project_id_idx on public.project_payments(project_id);
+create index if not exists project_events_project_id_idx on public.project_events(project_id);
+create index if not exists project_notes_project_id_idx on public.project_notes(project_id);
+create index if not exists project_partners_partner_id_idx on public.project_partners(partner_id);
+create index if not exists costs_project_id_idx on public.costs(project_id);
+create index if not exists cash_movements_source_project_id_idx on public.cash_movements(source_project_id);
 
 alter table public.clients enable row level security;
 alter table public.projects enable row level security;

@@ -1,10 +1,11 @@
 import { PageHeader } from "@/components/ui";
-import { costs, projects } from "@/lib/mock-data";
+import { getAppData } from "@/lib/data";
 import { getOverviewMetrics } from "@/lib/metrics";
 import { money } from "@/lib/format";
 
-export default function CostsPage() {
-  const metrics = getOverviewMetrics();
+export default async function CostsPage() {
+  const data = await getAppData();
+  const metrics = getOverviewMetrics(data);
 
   return (
     <>
@@ -30,11 +31,11 @@ export default function CostsPage() {
         <article className="panel-block costs-panel">
           <div className="block-heading">
             <span className="eyebrow">Inventario operativo</span>
-            <span>{costs.length} costos</span>
+            <span>{data.costs.length} costos · {data.source === "supabase" ? "Supabase" : "Mock"}</span>
           </div>
           <div className="data-list">
-            {costs.map((cost) => {
-              const project = projects.find((item) => item.id === cost.projectId);
+            {data.costs.map((cost) => {
+              const project = data.projects.find((item) => item.id === cost.projectId);
 
               return (
                 <article className="data-row cost-row" key={cost.id}>

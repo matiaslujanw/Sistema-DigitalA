@@ -2312,6 +2312,19 @@ body {
   font-size: 0.82rem;
 }
 
+.form-feedback,
+.detail-feedback {
+  margin: 0 0 18px;
+  color: var(--exec-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.detail-feedback {
+  padding: 0 40px;
+}
+
 .schedule-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { addCashMovementAction } from "@/app/actions/projects";
 import type { CashMovement, FinanceOperation } from "@/lib/types";
 import { dateLabel, money } from "@/lib/format";
 
@@ -8,12 +10,17 @@ const operationOptions: FinanceOperation[] = ["Cobro", "Reparto socios", "Compra
 
 export function FinanceWorkspace({
   initialMovements,
-  projectNames
+  projectNames,
+  source
 }: {
   initialMovements: CashMovement[];
   projectNames: Record<string, string>;
+  source: "mock" | "supabase";
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [movements, setMovements] = useState<CashMovement[]>(initialMovements);
+  const [feedback, setFeedback] = useState(source === "supabase" ? "Conectado a Supabase" : "Fallback mock");
   const [draft, setDraft] = useState({
     concept: "",
     amount: "",
@@ -27,17 +34,6 @@ export function FinanceWorkspace({
     actualReturnPercent: "",
     notes: ""
   });
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem("da-finance-movements");
-    if (saved) {
-      setMovements(JSON.parse(saved) as CashMovement[]);
-    }
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem("da-finance-movements", JSON.stringify(movements));
-  }, [movements]);
 
   const destinationTotals = useMemo(() => {
     return movements.reduce<Record<string, number>>((acc, movement) => {
@@ -67,13 +63,23 @@ export function FinanceWorkspace({
       notes: draft.notes || "Movimiento cargado manualmente"
     };
 
-    setMovements((current) => [movement, ...current]);
-    setDraft((current) => ({ ...current, concept: "", amount: "", acquiredAmount: "", exchangeRate: "", notes: "" }));
-  }
+    if (source !== "supabase") {
+      setMovements((current) => [movement, ...current]);
+      setDraft((current) => ({ ...current, concept: "", amount: "", acquiredAmount: "", exchangeRate: "", notes: "" }));
+      return;
+    }
 
-  function resetMovements() {
-    window.localStorage.removeItem("da-finance-movements");
-    setMovements(initialMovements);
+    startTransition(async () => {
+      try {
+        await addCashMovementAction(movement);
+        setMovements((current) => [movement, ...current]);
+        setDraft((current) => ({ ...current, concept: "", amount: "", acquiredAmount: "", exchangeRate: "", notes: "" }));
+        setFeedback("Movimiento guardado en Supabase");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo guardar el movimiento");
+      }
+    });
   }
 
   return (
@@ -81,8 +87,9 @@ export function FinanceWorkspace({
       <article className="panel-block finance-form-panel">
         <div className="block-heading">
           <span className="eyebrow">Nueva decision de caja</span>
-          <button className="text-button" type="button" onClick={resetMovements}>Reset local</button>
+          <span>{source === "supabase" ? "Supabase" : "Mock"}</span>
         </div>
+        <p className="form-feedback">{feedback}</p>
 
         <div className="finance-form">
           <label className="field">
@@ -156,7 +163,9 @@ export function FinanceWorkspace({
             <input value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} />
           </label>
 
-          <button className="command-button" type="button" onClick={addMovement}>Agregar movimiento</button>
+          <button className="command-button" disabled={isPending} type="button" onClick={addMovement}>
+            {isPending ? "Guardando" : "Agregar movimiento"}
+          </button>
         </div>
       </article>
 
