@@ -234,12 +234,15 @@ export function ProjectDetailEditor({
           <div className="field-grid">
             <label className="field">
               <span>Total pactado</span>
-              <input
-                min="0"
-                type="number"
-                value={project.salePrice}
-                onChange={(event) => updateProject("salePrice", Number(event.target.value))}
-              />
+              <div className="money-input-control">
+                <span>{project.currency === "ARS" ? "AR$" : "US$"}</span>
+                <input
+                  inputMode="decimal"
+                  value={formatEditableMoney(project.salePrice, project.currency)}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onChange={(event) => updateProject("salePrice", parseMoneyInput(event.target.value))}
+                />
+              </div>
             </label>
 
             <label className="field">
@@ -404,4 +407,16 @@ export function ProjectDetailEditor({
       </section>
     </section>
   );
+}
+
+function formatEditableMoney(amount: number, currency: "ARS" | "USD") {
+  return new Intl.NumberFormat("es-AR", {
+    maximumFractionDigits: currency === "ARS" ? 0 : 2,
+    minimumFractionDigits: 0
+  }).format(amount);
+}
+
+function parseMoneyInput(value: string) {
+  const normalized = value.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
+  return Number(normalized) || 0;
 }
