@@ -8,10 +8,12 @@ import type { PaymentMethod, ProjectStatus } from "@/lib/types";
 
 const paymentMethods: PaymentMethod[] = ["Transferencia", "Efectivo", "USD", "Cheque", "Mixto"];
 
-export function NewProjectForm() {
+export function NewProjectForm({ initialDetail = "", initialName = "" }: { initialDetail?: string; initialName?: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [feedback, setFeedback] = useState("Se guarda en Supabase si las tablas ya estan creadas.");
+  const [feedback, setFeedback] = useState(
+    initialName ? "Datos precargados desde una idea del tablero." : "Se guarda en Supabase si las tablas ya estan creadas."
+  );
   const [draft, setDraft] = useState({
     clientContact: "",
     clientIndustry: "",
@@ -19,8 +21,8 @@ export function NewProjectForm() {
     contractSigned: false,
     currency: "ARS" as "ARS" | "USD",
     marginTarget: "60",
-    name: "",
-    nextMilestone: "Primer relevamiento",
+    name: initialName,
+    nextMilestone: initialDetail ? `Validar: ${initialDetail.slice(0, 80)}` : "Primer relevamiento",
     paymentMethod: "Transferencia" as PaymentMethod,
     salePrice: "",
     startDate: new Date().toISOString().slice(0, 10),

@@ -8,6 +8,7 @@ type IdeaInput = {
   body: string;
   kind: string;
   need: string;
+  projectId?: string | null;
   title: string;
   urgency: IdeaUrgency;
 };
@@ -20,6 +21,7 @@ export async function createIdeaAction(input: IdeaInput) {
       body: input.body,
       kind: input.kind || "Nota",
       need: input.need,
+      project_id: input.projectId ?? null,
       title: input.title || "Nota sin titulo",
       urgency: input.urgency
     })
@@ -40,6 +42,7 @@ export async function updateIdeaAction(ideaId: string, input: IdeaInput) {
       body: input.body,
       kind: input.kind || "Nota",
       need: input.need,
+      project_id: input.projectId ?? null,
       title: input.title || "Nota sin titulo",
       updated_at: new Date().toISOString(),
       urgency: input.urgency

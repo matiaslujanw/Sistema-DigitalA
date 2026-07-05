@@ -131,6 +131,7 @@ create table if not exists public.cash_movements (
 
 create table if not exists public.ideas (
   id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete set null,
   title text not null,
   kind text not null default 'Idea',
   body text not null default '',
@@ -140,6 +141,10 @@ create table if not exists public.ideas (
   updated_at timestamptz not null default now()
 );
 
+-- Si la tabla ideas ya existia sin vinculo a proyecto, agregarlo.
+alter table public.ideas add column if not exists project_id uuid references public.projects(id) on delete set null;
+
+create index if not exists ideas_project_id_idx on public.ideas(project_id);
 create index if not exists projects_client_id_idx on public.projects(client_id);
 create index if not exists project_payments_project_id_idx on public.project_payments(project_id);
 create index if not exists project_events_project_id_idx on public.project_events(project_id);

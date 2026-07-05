@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { addProjectNoteAction, addProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
-import type { Client, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
+import type { Client, Idea, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
 import { projectStatuses } from "@/lib/project-statuses";
 import { dateLabel, daysBetween, money } from "@/lib/format";
 import { StatusPill } from "./ui";
@@ -20,34 +20,39 @@ const noteTypes: ProjectNote["type"][] = ["Reunion", "Relevamiento", "Decision",
 export function ProjectDetailEditor({
   client,
   events,
+  ideas,
   initialNotes,
   initialProject,
   initialPayments,
+  partnerNames,
   source
 }: {
   client: Client;
   events: ProjectEvent[];
+  ideas: Idea[];
   initialNotes: ProjectNote[];
   initialProject: Project;
   initialPayments: ProjectPayment[];
+  partnerNames: string[];
   source: "mock" | "supabase";
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [project, setProject] = useState<EditableProject>({ ...initialProject, notes: initialNotes, payments: initialPayments });
   const [feedback, setFeedback] = useState(source === "supabase" ? "Conectado a Supabase" : "Fallback mock: corre el SQL y seed para persistir");
+  const today = new Date().toISOString().slice(0, 10);
   const [paymentDraft, setPaymentDraft] = useState({
     amount: "",
     currency: initialProject.currency,
-    date: "2026-07-03",
+    date: today,
     method: initialProject.paymentMethod,
     note: ""
   });
   const [noteDraft, setNoteDraft] = useState({
     body: "",
     createsTask: false,
-    date: "2026-07-04",
-    owner: "Matias",
+    date: today,
+    owner: partnerNames[0] ?? "",
     title: "",
     type: "Relevamiento" as ProjectNote["type"]
   });
@@ -327,13 +332,19 @@ export function ProjectDetailEditor({
                 </div>
               </article>
             ))}
+            {project.payments.length === 0 ? (
+              <div className="panel-empty">
+                <strong>Sin pagos registrados.</strong>
+                <span>Carga el primero con el formulario de arriba.</span>
+              </div>
+            ) : null}
           </div>
         </article>
 
         <article className="panel-block trace-board detail-trace">
           <div className="block-heading">
             <span className="eyebrow">Trazabilidad</span>
-            <span>{sortedEvents.length} eventos</span>
+            <span>{sortedEvents.length} eventos · <Link className="inline-link" href="/novedades/nueva">Cargar novedad</Link></span>
           </div>
           <div className="event-stack">
             {sortedEvents.map((event) => (
@@ -344,8 +355,33 @@ export function ProjectDetailEditor({
                 <small>{event.owner} · {event.hours} h</small>
               </article>
             ))}
+            {sortedEvents.length === 0 ? (
+              <div className="panel-empty">
+                <strong>Sin eventos todavia.</strong>
+                <Link href="/novedades/nueva">Cargar la primera novedad</Link>
+              </div>
+            ) : null}
           </div>
         </article>
+
+        {ideas.length > 0 ? (
+          <article className="panel-block linked-ideas-panel">
+            <div className="block-heading">
+              <span className="eyebrow">Ideas vinculadas</span>
+              <span>{ideas.length} {ideas.length === 1 ? "idea" : "ideas"} · <Link className="inline-link" href="/ideas">Ver tablero</Link></span>
+            </div>
+            <div className="notes-list">
+              {ideas.map((idea) => (
+                <article className="note-card" key={idea.id}>
+                  <span>{idea.kind} · {idea.createdAt} · urgencia {idea.urgency}</span>
+                  <strong>{idea.title}</strong>
+                  <p>{idea.body || "Sin detalle todavia."}</p>
+                  {idea.need ? <small>Necesita: {idea.need}</small> : null}
+                </article>
+              ))}
+            </div>
+          </article>
+        ) : null}
 
         <article className="panel-block notes-panel">
           <div className="block-heading">
@@ -369,7 +405,14 @@ export function ProjectDetailEditor({
               </label>
               <label className="field">
                 <span>Responsable</span>
-                <input value={noteDraft.owner} onChange={(event) => setNoteDraft((current) => ({ ...current, owner: event.target.value }))} />
+                <input
+                  list="detail-note-partners"
+                  value={noteDraft.owner}
+                  onChange={(event) => setNoteDraft((current) => ({ ...current, owner: event.target.value }))}
+                />
+                <datalist id="detail-note-partners">
+                  {partnerNames.map((name) => <option key={name} value={name} />)}
+                </datalist>
               </label>
               <label className="field checkbox-field">
                 <input
@@ -400,6 +443,12 @@ export function ProjectDetailEditor({
                 {note.createsTask ? <small>Genera tarea o feature</small> : null}
               </article>
             ))}
+            {project.notes.length === 0 ? (
+              <div className="panel-empty">
+                <strong>Sin notas ni relevamientos.</strong>
+                <span>Anota lo hablado en reuniones para no perder contexto.</span>
+              </div>
+            ) : null}
           </div>
         </article>
       </section>

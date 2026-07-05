@@ -101,6 +101,7 @@ type DbCost = {
 
 type DbIdea = {
   id: string;
+  project_id: string | null;
   title: string;
   kind: string;
   body: string;
@@ -161,7 +162,9 @@ export async function getProjectDetail(projectId: string) {
   return {
     client,
     events: data.events.filter((event) => event.projectId === projectId),
+    ideas: data.ideas.filter((idea) => idea.projectId === projectId),
     notes: data.notes.filter((note) => note.projectId === projectId),
+    partnerNames: data.partnerProfiles.filter((partner) => partner.status === "Activo").map((partner) => partner.name),
     payments: data.payments.filter((payment) => payment.projectId === projectId),
     project,
     source: data.source
@@ -311,6 +314,7 @@ async function getSupabaseData(): Promise<AppData> {
       createdAt: idea.created_at.slice(0, 10),
       kind: idea.kind,
       need: idea.need,
+      projectId: idea.project_id,
       title: idea.title,
       urgency: idea.urgency
     })),

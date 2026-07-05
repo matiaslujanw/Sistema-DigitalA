@@ -111,6 +111,7 @@ export type IdeaUrgency = "baja" | "media" | "alta" | "urgente";
 
 export type Idea = {
   id: string;
+  projectId: string | null;
   title: string;
   kind: string;
   body: string;

@@ -1,11 +1,12 @@
 "use client";
 
 import type { FormEvent } from "react";
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createIdeaAction, deleteIdeaAction, updateIdeaAction } from "@/app/actions/ideas";
 import { localKeys } from "@/lib/local-keys";
-import type { Idea, IdeaUrgency } from "@/lib/types";
+import type { Idea, IdeaUrgency, Project } from "@/lib/types";
 
 const urgencies: Array<{ label: string; value: IdeaUrgency }> = [
   { label: "Baja", value: "baja" },
@@ -18,15 +19,18 @@ const emptyDraft: Omit<Idea, "id" | "createdAt"> = {
   body: "",
   kind: "Idea",
   need: "",
+  projectId: null,
   title: "",
   urgency: "media"
 };
 
 export function IdeasWorkspace({
   initialIdeas,
+  projects,
   source
 }: {
   initialIdeas: Idea[];
+  projects: Project[];
   source: "mock" | "supabase";
 }) {
   const router = useRouter();
@@ -71,6 +75,7 @@ export function IdeasWorkspace({
       body: draft.body.trim(),
       kind: draft.kind.trim() || "Nota",
       need: draft.need.trim(),
+      projectId: draft.projectId,
       title: draft.title.trim() || "Nota sin titulo",
       urgency: draft.urgency
     };
@@ -117,6 +122,7 @@ export function IdeasWorkspace({
       body: note.body,
       kind: note.kind,
       need: note.need,
+      projectId: note.projectId,
       title: note.title,
       urgency: note.urgency
     });
@@ -192,6 +198,15 @@ export function IdeasWorkspace({
             <span>Necesito</span>
             <input value={draft.need} onChange={(event) => setDraft((current) => ({ ...current, need: event.target.value }))} placeholder="Reunion, datos, decision..." />
           </label>
+          <label>
+            <span>Proyecto vinculado</span>
+            <select value={draft.projectId ?? ""} onChange={(event) => setDraft((current) => ({ ...current, projectId: event.target.value || null }))}>
+              <option value="">Sin proyecto (idea suelta)</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.name}</option>
+              ))}
+            </select>
+          </label>
           <div className="urgency-picker" role="radiogroup" aria-label="Urgencia">
             {urgencies.map((urgency) => (
               <button
@@ -215,27 +230,43 @@ export function IdeasWorkspace({
       </form>
 
       <section className="sticky-board" aria-label="Tablero de notas">
-        {notes.map((note, index) => (
-          <article className={`sticky-note ${note.urgency} tilt-${index % 4}`} key={note.id}>
-            <header>
-              <span>{note.kind}</span>
-              <small>{urgencyLabel(note.urgency)}</small>
-            </header>
-            <h2>{note.title}</h2>
-            <p>{note.body || "Sin detalle todavia."}</p>
-            {note.need ? (
-              <div>
-                <span>Necesito</span>
-                <strong>{note.need}</strong>
-              </div>
-            ) : null}
-            <footer>
-              <time>{note.createdAt}</time>
-              <button type="button" onClick={() => editNote(note)}>Editar</button>
-              <button type="button" onClick={() => deleteNote(note.id)}>Borrar</button>
-            </footer>
-          </article>
-        ))}
+        {notes.map((note, index) => {
+          const linkedProject = note.projectId ? projects.find((project) => project.id === note.projectId) : null;
+          return (
+            <article className={`sticky-note ${note.urgency} tilt-${index % 4}`} key={note.id}>
+              <header>
+                <span>{note.kind}</span>
+                <small>{urgencyLabel(note.urgency)}</small>
+              </header>
+              <h2>{note.title}</h2>
+              <p>{note.body || "Sin detalle todavia."}</p>
+              {linkedProject ? (
+                <Link className="sticky-project-link" href={`/proyectos/${linkedProject.id}`}>
+                  ⇢ {linkedProject.name}
+                </Link>
+              ) : null}
+              {note.need ? (
+                <div>
+                  <span>Necesito</span>
+                  <strong>{note.need}</strong>
+                </div>
+              ) : null}
+              <footer>
+                <time>{note.createdAt}</time>
+                <button type="button" onClick={() => editNote(note)}>Editar</button>
+                {!linkedProject ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/proyectos/nuevo?nombre=${encodeURIComponent(note.title)}&detalle=${encodeURIComponent(note.body)}`)}
+                  >
+                    → Proyecto
+                  </button>
+                ) : null}
+                <button type="button" onClick={() => deleteNote(note.id)}>Borrar</button>
+              </footer>
+            </article>
+          );
+        })}
         {notes.length === 0 ? (
           <div className="panel-empty">
             <strong>Todavia no hay notas.</strong>
@@ -254,6 +285,7 @@ function normalizeNote(note: Partial<Idea> & { note?: string; priority?: string;
     id: note.id ?? `note-${Math.random().toString(36).slice(2)}`,
     kind: note.kind ?? note.client ?? "Nota",
     need: note.need ?? note.nextAction ?? "",
+    projectId: note.projectId ?? null,
     title: note.title ?? "Nota sin titulo",
     urgency: normalizeUrgency(note.urgency ?? note.priority)
   };

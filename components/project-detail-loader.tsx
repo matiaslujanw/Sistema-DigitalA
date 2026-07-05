@@ -1,23 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import type { Client, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
+import type { Client, Idea, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
 import { ProjectDetailEditor } from "./project-detail-editor";
 
 export function ProjectDetailLoader({
   initialClient,
   initialEvents,
+  initialIdeas,
   initialNotes,
   initialPayments,
   initialProject,
+  partnerNames,
   projectId,
   source
 }: {
   initialClient: Client | null;
   initialEvents: ProjectEvent[];
+  initialIdeas: Idea[];
   initialNotes: ProjectNote[];
   initialPayments: ProjectPayment[];
   initialProject: Project | null;
+  partnerNames: string[];
   projectId: string;
   source: "mock" | "supabase";
 }) {
@@ -35,9 +39,11 @@ export function ProjectDetailLoader({
     <ProjectDetailEditor
       client={initialClient}
       events={initialEvents}
+      ideas={initialIdeas}
       initialNotes={initialNotes}
       initialPayments={initialPayments}
       initialProject={initialProject}
+      partnerNames={partnerNames}
       source={source}
     />
   );

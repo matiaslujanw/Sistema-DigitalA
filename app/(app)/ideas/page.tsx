@@ -4,5 +4,5 @@ import { getAppData } from "@/lib/data";
 export default async function IdeasPage() {
   const data = await getAppData();
 
-  return <IdeasWorkspace initialIdeas={data.ideas} source={data.source} />;
+  return <IdeasWorkspace initialIdeas={data.ideas} projects={data.projects} source={data.source} />;
 }
