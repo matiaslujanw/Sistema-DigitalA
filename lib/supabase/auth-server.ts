@@ -7,6 +7,10 @@ export function isSupabaseAuthConfigured() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
+export function shouldRequireSupabaseAuth() {
+  return process.env.NODE_ENV === "production" || isSupabaseAuthConfigured();
+}
+
 // Server client bound to the request cookies (Next 15 `cookies()` is async).
 // Used from server components and server actions to read the current user and sign out.
 export async function createSupabaseAuthServerClient() {

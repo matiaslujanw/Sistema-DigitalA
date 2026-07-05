@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAuthServerClient, isSupabaseAuthConfigured, shouldRequireSupabaseAuth } from "@/lib/supabase/auth-server";
 import { partnerProfiles } from "@/lib/mock-data";
 import type { CashMovement, Cost, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectStatus } from "@/lib/types";
 
@@ -86,6 +87,7 @@ type AddCashMovementInput = {
 };
 
 export async function createProjectAction(input: CreateProjectInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const partners = await ensureDefaultPartners();
 
@@ -138,6 +140,7 @@ export async function createProjectAction(input: CreateProjectInput) {
 }
 
 export async function updateProjectAction(projectId: string, input: UpdateProjectInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const payload: Record<string, unknown> = {};
 
@@ -156,6 +159,7 @@ export async function updateProjectAction(projectId: string, input: UpdateProjec
 }
 
 export async function addProjectPaymentAction(input: AddPaymentInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("project_payments")
@@ -178,6 +182,7 @@ export async function addProjectPaymentAction(input: AddPaymentInput) {
 }
 
 export async function addProjectNoteAction(input: AddNoteInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const ownerId = await findOrCreatePartner(input.owner);
 
@@ -214,6 +219,7 @@ export async function addProjectNoteAction(input: AddNoteInput) {
 }
 
 export async function addProjectEventAction(input: AddEventInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const ownerId = await findOrCreatePartner(input.owner);
 
@@ -239,6 +245,7 @@ export async function addProjectEventAction(input: AddEventInput) {
 }
 
 export async function addCostAction(input: AddCostInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("costs")
@@ -262,6 +269,7 @@ export async function addCostAction(input: AddCostInput) {
 }
 
 export async function addCashMovementAction(input: AddCashMovementInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("cash_movements")
@@ -291,6 +299,7 @@ export async function addCashMovementAction(input: AddCashMovementInput) {
 }
 
 export async function deleteProjectPaymentAction(paymentId: string) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data: payment, error: fetchError } = await supabase.from("project_payments").select("project_id").eq("id", paymentId).single();
   if (fetchError) throw new Error(fetchError.message);
@@ -303,6 +312,7 @@ export async function deleteProjectPaymentAction(paymentId: string) {
 }
 
 export async function deleteProjectNoteAction(noteId: string) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data: note, error: fetchError } = await supabase
     .from("project_notes")
@@ -330,6 +340,7 @@ export async function deleteProjectNoteAction(noteId: string) {
 }
 
 export async function deleteProjectEventAction(eventId: string) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data: event, error: fetchError } = await supabase.from("project_events").select("project_id").eq("id", eventId).single();
   if (fetchError) throw new Error(fetchError.message);
@@ -342,6 +353,7 @@ export async function deleteProjectEventAction(eventId: string) {
 }
 
 export async function deleteCostAction(costId: string) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("costs").delete().eq("id", costId);
   if (error) throw new Error(error.message);
@@ -351,12 +363,25 @@ export async function deleteCostAction(costId: string) {
 }
 
 export async function deleteCashMovementAction(movementId: string) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("cash_movements").delete().eq("id", movementId);
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard");
   revalidatePath("/finanzas");
+}
+
+async function requireAuthenticatedAction() {
+  if (!shouldRequireSupabaseAuth()) return;
+  if (!isSupabaseAuthConfigured()) throw new Error("Supabase auth env vars are missing.");
+
+  const supabase = await createSupabaseAuthServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("No autorizado");
 }
 
 async function ensureDefaultPartners() {

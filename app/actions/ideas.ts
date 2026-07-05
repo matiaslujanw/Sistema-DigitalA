@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAuthServerClient, isSupabaseAuthConfigured, shouldRequireSupabaseAuth } from "@/lib/supabase/auth-server";
 import type { IdeaUrgency } from "@/lib/types";
 
 type IdeaInput = {
@@ -14,6 +15,7 @@ type IdeaInput = {
 };
 
 export async function createIdeaAction(input: IdeaInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("ideas")
@@ -35,6 +37,7 @@ export async function createIdeaAction(input: IdeaInput) {
 }
 
 export async function updateIdeaAction(ideaId: string, input: IdeaInput) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { error } = await supabase
     .from("ideas")
@@ -55,10 +58,23 @@ export async function updateIdeaAction(ideaId: string, input: IdeaInput) {
 }
 
 export async function deleteIdeaAction(ideaId: string) {
+  await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("ideas").delete().eq("id", ideaId);
 
   if (error) throw new Error(error.message);
 
   revalidatePath("/ideas");
+}
+
+async function requireAuthenticatedAction() {
+  if (!shouldRequireSupabaseAuth()) return;
+  if (!isSupabaseAuthConfigured()) throw new Error("Supabase auth env vars are missing.");
+
+  const supabase = await createSupabaseAuthServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("No autorizado");
 }
