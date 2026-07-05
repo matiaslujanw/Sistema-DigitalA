@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addProjectNoteAction, addProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
+import { addProjectNoteAction, addProjectPaymentAction, deleteProjectNoteAction, deleteProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
 import type { Client, Idea, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
 import { projectStatuses } from "@/lib/project-statuses";
 import { dateLabel, daysBetween, money } from "@/lib/format";
@@ -39,6 +39,7 @@ export function ProjectDetailEditor({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [project, setProject] = useState<EditableProject>({ ...initialProject, notes: initialNotes, payments: initialPayments });
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState(source === "supabase" ? "Conectado a Supabase" : "Fallback mock: corre el SQL y seed para persistir");
   const today = new Date().toISOString().slice(0, 10);
   const [paymentDraft, setPaymentDraft] = useState({
@@ -116,7 +117,7 @@ export function ProjectDetailEditor({
 
     startTransition(async () => {
       try {
-        await addProjectPaymentAction({
+        const newId = await addProjectPaymentAction({
           amount,
           currency: paymentDraft.currency,
           date: paymentDraft.date,
@@ -124,7 +125,7 @@ export function ProjectDetailEditor({
           note: payment.note,
           projectId: project.id
         });
-        setProject((current) => ({ ...current, payments: [payment, ...current.payments] }));
+        setProject((current) => ({ ...current, payments: [{ ...payment, id: newId }, ...current.payments] }));
         setPaymentDraft((current) => ({ ...current, amount: "", note: "" }));
         setFeedback("Pago guardado en Supabase");
         router.refresh();
@@ -156,7 +157,7 @@ export function ProjectDetailEditor({
 
     startTransition(async () => {
       try {
-        await addProjectNoteAction({
+        const newId = await addProjectNoteAction({
           body: note.body,
           createsTask: note.createsTask,
           date: note.date,
@@ -165,12 +166,70 @@ export function ProjectDetailEditor({
           title: note.title,
           type: note.type
         });
-        setProject((current) => ({ ...current, notes: [note, ...current.notes] }));
+        setProject((current) => ({ ...current, notes: [{ ...note, id: newId }, ...current.notes] }));
         setNoteDraft((current) => ({ ...current, body: "", createsTask: false, title: "" }));
         setFeedback("Nota guardada en Supabase");
         router.refresh();
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "No se pudo guardar la nota");
+      }
+    });
+  }
+
+  function deletePayment(payment: ProjectPayment) {
+    const confirmId = `payment-${payment.id}`;
+    if (confirmingDeleteId !== confirmId) {
+      setConfirmingDeleteId(confirmId);
+      return;
+    }
+
+    const removeLocally = () => {
+      setProject((current) => ({ ...current, payments: current.payments.filter((item) => item.id !== payment.id) }));
+      setConfirmingDeleteId(null);
+    };
+
+    if (source !== "supabase") {
+      removeLocally();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteProjectPaymentAction(payment.id);
+        removeLocally();
+        setFeedback("Pago eliminado");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar el pago");
+      }
+    });
+  }
+
+  function deleteNote(note: ProjectNote) {
+    const confirmId = `note-${note.id}`;
+    if (confirmingDeleteId !== confirmId) {
+      setConfirmingDeleteId(confirmId);
+      return;
+    }
+
+    const removeLocally = () => {
+      setProject((current) => ({ ...current, notes: current.notes.filter((item) => item.id !== note.id) }));
+      setConfirmingDeleteId(null);
+    };
+
+    if (source !== "supabase") {
+      removeLocally();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteProjectNoteAction(note.id);
+        removeLocally();
+        setFeedback("Nota eliminada");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar la nota");
       }
     });
   }
@@ -330,6 +389,12 @@ export function ProjectDetailEditor({
                   <strong>{money(payment.amount, payment.currency)}</strong>
                   <span>{payment.currency}</span>
                 </div>
+                <div className="row-actions">
+                  <button className={confirmingDeleteId === `payment-${payment.id}` ? "danger-confirm" : ""} disabled={isPending} type="button" onClick={() => deletePayment(payment)}>
+                    {confirmingDeleteId === `payment-${payment.id}` ? "Confirmar" : "Borrar"}
+                  </button>
+                  {confirmingDeleteId === `payment-${payment.id}` ? <button type="button" onClick={() => setConfirmingDeleteId(null)}>Cancelar</button> : null}
+                </div>
               </article>
             ))}
             {project.payments.length === 0 ? (
@@ -441,6 +506,12 @@ export function ProjectDetailEditor({
                 <strong>{note.title}</strong>
                 <p>{note.body}</p>
                 {note.createsTask ? <small>Genera tarea o feature</small> : null}
+                <div className="row-actions">
+                  <button className={confirmingDeleteId === `note-${note.id}` ? "danger-confirm" : ""} disabled={isPending} type="button" onClick={() => deleteNote(note)}>
+                    {confirmingDeleteId === `note-${note.id}` ? "Confirmar" : "Borrar"}
+                  </button>
+                  {confirmingDeleteId === `note-${note.id}` ? <button type="button" onClick={() => setConfirmingDeleteId(null)}>Cancelar</button> : null}
+                </div>
               </article>
             ))}
             {project.notes.length === 0 ? (

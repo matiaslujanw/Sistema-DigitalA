@@ -157,34 +157,43 @@ export async function updateProjectAction(projectId: string, input: UpdateProjec
 
 export async function addProjectPaymentAction(input: AddPaymentInput) {
   const supabase = createSupabaseServerClient();
-  const { error } = await supabase.from("project_payments").insert({
-    amount: input.amount,
-    currency: input.currency,
-    happened_on: input.date,
-    method: input.method,
-    note: input.note || "Pago registrado",
-    project_id: input.projectId
-  });
+  const { data, error } = await supabase
+    .from("project_payments")
+    .insert({
+      amount: input.amount,
+      currency: input.currency,
+      happened_on: input.date,
+      method: input.method,
+      note: input.note || "Pago registrado",
+      project_id: input.projectId
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
 
   await syncProjectPaidAmount(input.projectId);
   revalidateProjectPaths(input.projectId);
+  return data.id as string;
 }
 
 export async function addProjectNoteAction(input: AddNoteInput) {
   const supabase = createSupabaseServerClient();
   const ownerId = await findOrCreatePartner(input.owner);
 
-  const { error } = await supabase.from("project_notes").insert({
-    body: input.body,
-    creates_task: input.createsTask,
-    happened_on: input.date,
-    owner_partner_id: ownerId,
-    project_id: input.projectId,
-    title: input.title,
-    type: input.type
-  });
+  const { data, error } = await supabase
+    .from("project_notes")
+    .insert({
+      body: input.body,
+      creates_task: input.createsTask,
+      happened_on: input.date,
+      owner_partner_id: ownerId,
+      project_id: input.projectId,
+      title: input.title,
+      type: input.type
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
 
@@ -201,64 +210,149 @@ export async function addProjectNoteAction(input: AddNoteInput) {
   if (eventError) throw new Error(eventError.message);
 
   revalidateProjectPaths(input.projectId);
+  return data.id as string;
 }
 
 export async function addProjectEventAction(input: AddEventInput) {
   const supabase = createSupabaseServerClient();
   const ownerId = await findOrCreatePartner(input.owner);
 
-  const { error } = await supabase.from("project_events").insert({
-    happened_on: input.date,
-    hours: input.hours,
-    notes: input.notes,
-    owner_partner_id: ownerId,
-    project_id: input.projectId,
-    title: input.title,
-    type: input.type
-  });
+  const { data, error } = await supabase
+    .from("project_events")
+    .insert({
+      happened_on: input.date,
+      hours: input.hours,
+      notes: input.notes,
+      owner_partner_id: ownerId,
+      project_id: input.projectId,
+      title: input.title,
+      type: input.type
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
 
   revalidateProjectPaths(input.projectId);
   revalidatePath("/reuniones");
+  return data.id as string;
 }
 
 export async function addCostAction(input: AddCostInput) {
   const supabase = createSupabaseServerClient();
-  const { error } = await supabase.from("costs").insert({
-    amount: input.amount,
-    cadence: input.cadence,
-    category: input.category,
-    currency: input.currency,
-    name: input.name,
-    project_id: input.projectId ?? null,
-    provider: input.provider || "Sin proveedor"
-  });
+  const { data, error } = await supabase
+    .from("costs")
+    .insert({
+      amount: input.amount,
+      cadence: input.cadence,
+      category: input.category,
+      currency: input.currency,
+      name: input.name,
+      project_id: input.projectId ?? null,
+      provider: input.provider || "Sin proveedor"
+    })
+    .select("id")
+    .single();
 
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/costos");
+  revalidatePath("/dashboard");
+  return data.id as string;
+}
+
+export async function addCashMovementAction(input: AddCashMovementInput) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("cash_movements")
+    .insert({
+      acquired_amount: input.acquiredAmount,
+      acquired_currency: input.acquiredCurrency,
+      actual_return_percent: input.actualReturnPercent,
+      amount: input.amount,
+      concept: input.concept,
+      currency: input.currency,
+      destination: input.destination,
+      exchange_rate: input.exchangeRate,
+      expected_return_percent: input.expectedReturnPercent,
+      happened_on: input.date,
+      notes: input.notes,
+      operation: input.operation,
+      source_project_id: input.sourceProjectId ?? null
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/finanzas");
+  return data.id as string;
+}
+
+export async function deleteProjectPaymentAction(paymentId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data: payment, error: fetchError } = await supabase.from("project_payments").select("project_id").eq("id", paymentId).single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const { error } = await supabase.from("project_payments").delete().eq("id", paymentId);
+  if (error) throw new Error(error.message);
+
+  await syncProjectPaidAmount(payment.project_id as string);
+  revalidateProjectPaths(payment.project_id as string);
+}
+
+export async function deleteProjectNoteAction(noteId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data: note, error: fetchError } = await supabase
+    .from("project_notes")
+    .select("body,happened_on,project_id,title,type")
+    .eq("id", noteId)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const { error } = await supabase.from("project_notes").delete().eq("id", noteId);
+  if (error) throw new Error(error.message);
+
+  await supabase
+    .from("project_events")
+    .delete()
+    .match({
+      happened_on: note.happened_on,
+      notes: note.body,
+      project_id: note.project_id,
+      title: note.title,
+      type: noteTypeToEventType(note.type as ProjectNote["type"])
+    });
+
+  revalidateProjectPaths(note.project_id as string);
+  revalidatePath("/reuniones");
+}
+
+export async function deleteProjectEventAction(eventId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data: event, error: fetchError } = await supabase.from("project_events").select("project_id").eq("id", eventId).single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const { error } = await supabase.from("project_events").delete().eq("id", eventId);
+  if (error) throw new Error(error.message);
+
+  revalidateProjectPaths(event.project_id as string);
+  revalidatePath("/reuniones");
+}
+
+export async function deleteCostAction(costId: string) {
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase.from("costs").delete().eq("id", costId);
   if (error) throw new Error(error.message);
 
   revalidatePath("/costos");
   revalidatePath("/dashboard");
 }
 
-export async function addCashMovementAction(input: AddCashMovementInput) {
+export async function deleteCashMovementAction(movementId: string) {
   const supabase = createSupabaseServerClient();
-  const { error } = await supabase.from("cash_movements").insert({
-    acquired_amount: input.acquiredAmount,
-    acquired_currency: input.acquiredCurrency,
-    actual_return_percent: input.actualReturnPercent,
-    amount: input.amount,
-    concept: input.concept,
-    currency: input.currency,
-    destination: input.destination,
-    exchange_rate: input.exchangeRate,
-    expected_return_percent: input.expectedReturnPercent,
-    happened_on: input.date,
-    notes: input.notes,
-    operation: input.operation,
-    source_project_id: input.sourceProjectId ?? null
-  });
-
+  const { error } = await supabase.from("cash_movements").delete().eq("id", movementId);
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard");

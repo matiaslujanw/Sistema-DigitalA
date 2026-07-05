@@ -4,5 +4,14 @@ import { getAppData } from "@/lib/data";
 export default async function CronogramaPage() {
   const data = await getAppData();
 
-  return <CronogramaWorkspace clients={data.clients} events={data.events} projects={data.projects} source={data.source} />;
+  return (
+    <CronogramaWorkspace
+      clients={data.clients}
+      events={data.events}
+      notes={data.notes}
+      payments={data.payments}
+      projects={data.projects}
+      source={data.source}
+    />
+  );
 }

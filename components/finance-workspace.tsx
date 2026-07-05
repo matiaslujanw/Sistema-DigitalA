@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addCashMovementAction } from "@/app/actions/projects";
+import { addCashMovementAction, deleteCashMovementAction } from "@/app/actions/projects";
 import { dateLabel, money } from "@/lib/format";
 import type { CashDestination, CashMovement, FinanceOperation } from "@/lib/types";
 
@@ -36,6 +36,7 @@ export function FinanceWorkspace({
   const [showForm, setShowForm] = useState(false);
   const [ledgerFilter, setLedgerFilter] = useState("Todos");
   const [feedback, setFeedback] = useState(source === "supabase" ? "Conectado a Supabase" : "Fallback mock");
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     concept: "",
     amount: "",
@@ -115,8 +116,8 @@ export function FinanceWorkspace({
 
     startTransition(async () => {
       try {
-        await addCashMovementAction(movement);
-        setMovements((current) => [movement, ...current]);
+        const newId = await addCashMovementAction(movement);
+        setMovements((current) => [{ ...movement, id: newId }, ...current]);
         resetDraft();
         setFeedback("Movimiento guardado en Supabase");
         router.refresh();
@@ -129,6 +130,34 @@ export function FinanceWorkspace({
   function resetDraft() {
     setDraft((current) => ({ ...current, concept: "", amount: "", acquiredAmount: "", exchangeRate: "", notes: "" }));
     setShowForm(false);
+  }
+
+  function deleteMovement(movement: CashMovement) {
+    if (confirmingDeleteId !== movement.id) {
+      setConfirmingDeleteId(movement.id);
+      return;
+    }
+
+    const removeLocally = () => {
+      setMovements((current) => current.filter((item) => item.id !== movement.id));
+      setConfirmingDeleteId(null);
+    };
+
+    if (source !== "supabase") {
+      removeLocally();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteCashMovementAction(movement.id);
+        removeLocally();
+        setFeedback("Movimiento eliminado");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar el movimiento");
+      }
+    });
   }
 
   return (
@@ -299,6 +328,7 @@ export function FinanceWorkspace({
           <span>Destino</span>
           <span>Monto</span>
           <span>Detalle</span>
+          <span>Accion</span>
         </div>
         {filteredMovements.map((movement) => (
           <article className="finance-ledger-row" key={movement.id}>
@@ -311,6 +341,12 @@ export function FinanceWorkspace({
             <mark>{movement.destination}</mark>
             <strong>{money(movement.amount, movement.currency)}</strong>
             <p>{movementDetails(movement)}</p>
+            <div className="table-actions">
+              <button className={confirmingDeleteId === movement.id ? "danger-confirm" : ""} disabled={isPending} type="button" onClick={() => deleteMovement(movement)}>
+                {confirmingDeleteId === movement.id ? "Confirmar" : "Borrar"}
+              </button>
+              {confirmingDeleteId === movement.id ? <button type="button" onClick={() => setConfirmingDeleteId(null)}>Cancelar</button> : null}
+            </div>
           </article>
         ))}
       </section>

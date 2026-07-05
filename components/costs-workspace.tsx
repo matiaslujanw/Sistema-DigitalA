@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addCostAction } from "@/app/actions/projects";
+import { addCostAction, deleteCostAction } from "@/app/actions/projects";
 import { money } from "@/lib/format";
 import type { Cost, Project } from "@/lib/types";
 
@@ -23,6 +23,7 @@ export function CostsWorkspace({
   const [costs, setCosts] = useState<Cost[]>(initialCosts);
   const [showForm, setShowForm] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     amount: "",
     cadence: "Mensual" as Cost["cadence"],
@@ -65,7 +66,7 @@ export function CostsWorkspace({
 
     startTransition(async () => {
       try {
-        await addCostAction({
+        const newId = await addCostAction({
           amount: cost.amount,
           cadence: cost.cadence,
           category: cost.category,
@@ -74,7 +75,7 @@ export function CostsWorkspace({
           projectId: cost.projectId,
           provider: cost.provider
         });
-        setCosts((current) => [cost, ...current]);
+        setCosts((current) => [{ ...cost, id: newId }, ...current]);
         resetDraft();
         setFeedback("Costo guardado en Supabase");
         router.refresh();
@@ -87,6 +88,34 @@ export function CostsWorkspace({
   function resetDraft() {
     setDraft((current) => ({ ...current, amount: "", name: "", provider: "" }));
     setShowForm(false);
+  }
+
+  function deleteCost(cost: Cost) {
+    if (confirmingDeleteId !== cost.id) {
+      setConfirmingDeleteId(cost.id);
+      return;
+    }
+
+    const removeLocally = () => {
+      setCosts((current) => current.filter((item) => item.id !== cost.id));
+      setConfirmingDeleteId(null);
+    };
+
+    if (source !== "supabase") {
+      removeLocally();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteCostAction(cost.id);
+        removeLocally();
+        setFeedback("Costo eliminado");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar el costo");
+      }
+    });
   }
 
   function exportCsv() {
@@ -201,6 +230,7 @@ export function CostsWorkspace({
           <span>Asociado a</span>
           <span>Estado</span>
           <span>Equivalente ARS</span>
+          <span>Accion</span>
         </div>
         {costs.map((cost) => {
           const project = projects.find((item) => item.id === cost.projectId);
@@ -218,6 +248,12 @@ export function CostsWorkspace({
               <mark>{project?.name ?? "Corporate"}</mark>
               <StatusBadge cost={cost} />
               <span>{cost.currency === "USD" ? money(cost.amount * exchangeRate) : "—"}</span>
+              <div className="table-actions">
+                <button className={confirmingDeleteId === cost.id ? "danger-confirm" : ""} disabled={isPending} type="button" onClick={() => deleteCost(cost)}>
+                  {confirmingDeleteId === cost.id ? "Confirmar" : "Borrar"}
+                </button>
+                {confirmingDeleteId === cost.id ? <button type="button" onClick={() => setConfirmingDeleteId(null)}>Cancelar</button> : null}
+              </div>
             </article>
           );
         })}

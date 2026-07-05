@@ -82,8 +82,58 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 a {
   color: inherit;
+}
+
+.row-actions,
+.table-actions,
+.timeline-actions,
+.meeting-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.row-actions button,
+.table-actions button,
+.timeline-actions button,
+.meeting-row-actions button {
+  min-height: 34px;
+  border: 1px solid #303442;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--exec-muted);
+  padding: 0 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.row-actions button.danger-confirm,
+.table-actions button.danger-confirm,
+.timeline-actions button.danger-confirm,
+.meeting-row-actions button.danger-confirm,
+.sticky-note footer button.danger-confirm {
+  border-color: var(--exec-red);
+  background: rgba(255, 114, 102, 0.12);
+  color: var(--exec-red);
+}
+
+.row-actions {
+  justify-content: flex-end;
+}
+
+.note-card .row-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
 }
 
 .product-shell {
@@ -743,11 +793,12 @@ h1 {
 .data-row {
   padding: 14px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
   gap: 10px 16px;
 }
 
-.data-row div:last-of-type {
+.data-row > div:nth-of-type(2) {
   text-align: right;
 }
 
@@ -2216,12 +2267,14 @@ body {
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 28px;
+  min-width: 0;
 }
 
 .timeline-heading h2 {
   margin: 4px 0 0;
   color: var(--exec-text);
   font-size: 1.8rem;
+  overflow-wrap: anywhere;
 }
 
 .timeline-heading > span {
@@ -2250,6 +2303,7 @@ body {
 
 .timeline-entry {
   position: relative;
+  min-width: 0;
 }
 
 .timeline-node {
@@ -2278,6 +2332,22 @@ body {
   color: var(--exec-blue);
 }
 
+.node-nota,
+.node-nota-interna,
+.node-alcance,
+.node-pedido-cliente,
+.node-cambio-de-alcance,
+.node-relevamiento,
+.node-decision {
+  border-color: #d7b46a;
+  color: #d7b46a;
+}
+
+.node-pago {
+  border-color: var(--exec-green);
+  color: var(--exec-green);
+}
+
 .node-entrega {
   border-color: var(--exec-green);
   color: var(--exec-green);
@@ -2289,6 +2359,7 @@ body {
 }
 
 .timeline-card {
+  min-width: 0;
   min-height: 138px;
   border: 1px solid #20242c;
   background: #0b0c0f;
@@ -2297,17 +2368,30 @@ body {
 
 .timeline-card-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 16px;
 }
 
 .timeline-card-header span {
   width: fit-content;
+  max-width: 100%;
   background: rgba(185, 205, 253, 0.1);
   color: var(--exec-blue);
   padding: 3px 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.timeline-entry-nota .timeline-card-header span {
+  background: rgba(215, 180, 106, 0.12);
+  color: #d7b46a;
+}
+
+.timeline-entry-pago .timeline-card-header span {
+  background: rgba(133, 230, 169, 0.12);
+  color: var(--exec-green);
 }
 
 .timeline-card-header small,
@@ -2319,19 +2403,32 @@ body {
   display: block;
   margin-top: 12px;
   color: var(--exec-text);
+  overflow-wrap: anywhere;
 }
 
 .timeline-card p {
   margin-top: 10px;
   color: #d5d7df;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .timeline-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 18px;
   margin-top: 18px;
   font-size: 0.82rem;
+}
+
+.timeline-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.timeline-actions {
+  margin-top: 18px;
 }
 
 .form-feedback,
@@ -2349,7 +2446,7 @@ body {
 
 .schedule-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 24px;
   margin-top: 60px;
   padding-top: 24px;
@@ -3884,8 +3981,8 @@ body {
 .finance-ledger-head,
 .finance-ledger-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.3fr) 180px 120px 130px 130px minmax(240px, 1fr);
-  min-width: 1060px;
+  grid-template-columns: minmax(220px, 1.3fr) 180px 120px 130px 130px minmax(240px, 1fr) 150px;
+  min-width: 1210px;
   align-items: center;
 }
 
@@ -4038,8 +4135,8 @@ body {
 .ops-table-head,
 .ops-table-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1.25fr) 150px 150px minmax(150px, 0.9fr) 120px 90px;
-  min-width: 980px;
+  grid-template-columns: minmax(240px, 1.25fr) 150px 150px minmax(150px, 0.9fr) 120px 110px 150px;
+  min-width: 1130px;
   align-items: center;
 }
 
@@ -4348,12 +4445,14 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 18px;
+  min-width: 0;
 }
 
 .quick-note-main,
 .quick-note-side {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .quick-note label {
@@ -4362,6 +4461,7 @@ body {
 }
 
 .quick-note input,
+.quick-note select,
 .quick-note textarea {
   width: 100%;
   border: 1px solid #303442;
@@ -4371,7 +4471,8 @@ body {
   outline: 0;
 }
 
-.quick-note input {
+.quick-note input,
+.quick-note select {
   height: 42px;
   padding: 0 12px;
 }
@@ -4432,6 +4533,7 @@ body {
 
 .quick-note-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -4443,16 +4545,18 @@ body {
     radial-gradient(circle at 20px 20px, rgba(176, 199, 255, 0.07) 0 2px, transparent 3px),
     #0b0c0e;
   background-size: 34px 34px;
-  padding: 28px;
+  padding: 34px 28px 28px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   align-items: start;
   gap: 24px;
+  overflow: visible;
 }
 
 .sticky-note {
   position: relative;
-  min-height: 230px;
+  min-width: 0;
+  min-height: 260px;
   border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 3px;
   background: #d8dee9;
@@ -4462,6 +4566,7 @@ body {
   gap: 12px;
   align-content: start;
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
+  overflow: visible;
 }
 
 .sticky-note::before {
@@ -4511,9 +4616,11 @@ body {
 
 .sticky-note header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   color: rgba(16, 17, 20, 0.66);
+  min-width: 0;
 }
 
 .sticky-note h2 {
@@ -4521,6 +4628,7 @@ body {
   color: #0e1014;
   font-size: 1.35rem;
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .sticky-note p {
@@ -4528,6 +4636,22 @@ body {
   color: rgba(16, 17, 20, 0.82);
   line-height: 1.42;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sticky-project-link {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(16, 17, 20, 0.16);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.24);
+  color: #0e1014;
+  padding: 7px 9px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .sticky-note div {
@@ -4535,6 +4659,7 @@ body {
   padding-top: 10px;
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .sticky-note div span {
@@ -4543,17 +4668,20 @@ body {
 
 .sticky-note div strong {
   color: #0e1014;
+  overflow-wrap: anywhere;
 }
 
 .sticky-note footer {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: auto;
+  min-width: 0;
 }
 
 .sticky-note time {
-  margin-right: auto;
+  flex: 1 1 100%;
   color: rgba(16, 17, 20, 0.54);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75rem;
@@ -4567,6 +4695,7 @@ body {
   color: #0e1014;
   padding: 7px 9px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 @media (max-width: 1180px) {
@@ -4585,6 +4714,10 @@ body {
   .sticky-board {
     grid-template-columns: 1fr;
     padding: 18px;
+  }
+
+  .sticky-note {
+    transform: none;
   }
 }
 
@@ -4699,6 +4832,11 @@ body {
 .meeting-row-meta small {
   color: var(--blue);
   font-size: 11px;
+}
+
+.meeting-row-actions {
+  justify-content: flex-end;
+  padding: 0 16px 12px 86px;
 }
 
 .meeting-minutes {

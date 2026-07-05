@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addProjectEventAction } from "@/app/actions/projects";
+import { addProjectEventAction, deleteProjectEventAction } from "@/app/actions/projects";
 import { dateLabel } from "@/lib/format";
 import type { Project, ProjectEvent } from "@/lib/types";
 
@@ -22,6 +22,7 @@ export function MeetingsWorkspace({
   const [meetings, setMeetings] = useState<ProjectEvent[]>(initialMeetings);
   const [showForm, setShowForm] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
   const [draft, setDraft] = useState({
@@ -75,7 +76,7 @@ export function MeetingsWorkspace({
 
     startTransition(async () => {
       try {
-        await addProjectEventAction({
+        const newId = await addProjectEventAction({
           date: meeting.date,
           hours: meeting.hours,
           notes: meeting.notes,
@@ -84,7 +85,7 @@ export function MeetingsWorkspace({
           title: meeting.title,
           type: "Reunion"
         });
-        setMeetings((current) => [meeting, ...current]);
+        setMeetings((current) => [{ ...meeting, id: newId }, ...current]);
         resetDraft();
         setFeedback("Reunion guardada en Supabase");
         router.refresh();
@@ -97,6 +98,35 @@ export function MeetingsWorkspace({
   function resetDraft() {
     setDraft((current) => ({ ...current, hours: "1", notes: "", title: "" }));
     setShowForm(false);
+  }
+
+  function deleteMeeting(meeting: ProjectEvent) {
+    if (confirmingDeleteId !== meeting.id) {
+      setConfirmingDeleteId(meeting.id);
+      return;
+    }
+
+    const removeLocally = () => {
+      setMeetings((current) => current.filter((item) => item.id !== meeting.id));
+      setExpandedId((current) => (current === meeting.id ? null : current));
+      setConfirmingDeleteId(null);
+    };
+
+    if (source !== "supabase") {
+      removeLocally();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteProjectEventAction(meeting.id);
+        removeLocally();
+        setFeedback("Reunion eliminada");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar la reunion");
+      }
+    });
   }
 
   return (
@@ -216,6 +246,12 @@ export function MeetingsWorkspace({
                     <small>{meeting.notes ? (expanded ? "Ocultar minuta" : "Ver minuta") : "Sin minuta"}</small>
                   </div>
                 </button>
+                <div className="meeting-row-actions">
+                  <button className={confirmingDeleteId === meeting.id ? "danger-confirm" : ""} disabled={isPending} type="button" onClick={() => deleteMeeting(meeting)}>
+                    {confirmingDeleteId === meeting.id ? "Confirmar borrado" : "Borrar"}
+                  </button>
+                  {confirmingDeleteId === meeting.id ? <button type="button" onClick={() => setConfirmingDeleteId(null)}>Cancelar</button> : null}
+                </div>
                 {expanded && meeting.notes ? <p className="meeting-minutes">{meeting.notes}</p> : null}
               </article>
             );

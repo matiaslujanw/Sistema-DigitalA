@@ -39,6 +39,7 @@ export function IdeasWorkspace({
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const isLocal = source !== "supabase";
 
   // Modo local: cargar y persistir en localStorage (comportamiento previo).
@@ -117,6 +118,7 @@ export function IdeasWorkspace({
   }
 
   function editNote(note: Idea) {
+    setConfirmingDeleteId(null);
     setEditingId(note.id);
     setDraft({
       body: note.body,
@@ -129,8 +131,14 @@ export function IdeasWorkspace({
   }
 
   function deleteNote(id: string) {
+    if (confirmingDeleteId !== id) {
+      setConfirmingDeleteId(id);
+      return;
+    }
+
     const removeLocally = () => {
       setNotes((current) => current.filter((note) => note.id !== id));
+      setConfirmingDeleteId(null);
       if (editingId === id) {
         setEditingId(null);
         setDraft(emptyDraft);
@@ -262,7 +270,10 @@ export function IdeasWorkspace({
                     → Proyecto
                   </button>
                 ) : null}
-                <button type="button" onClick={() => deleteNote(note.id)}>Borrar</button>
+                <button className={confirmingDeleteId === note.id ? "danger-confirm" : ""} type="button" onClick={() => deleteNote(note.id)}>
+                  {confirmingDeleteId === note.id ? "Confirmar" : "Borrar"}
+                </button>
+                {confirmingDeleteId === note.id ? <button type="button" onClick={() => setConfirmingDeleteId(null)}>Cancelar</button> : null}
               </footer>
             </article>
           );
