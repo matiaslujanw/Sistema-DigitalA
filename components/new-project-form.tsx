@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createProjectAction } from "@/app/actions/projects";
-import { PageHeader } from "@/components/ui";
 import { projectStatuses } from "@/lib/project-statuses";
 import type { PaymentMethod, ProjectStatus } from "@/lib/types";
 
@@ -24,7 +23,7 @@ export function NewProjectForm() {
     nextMilestone: "Primer relevamiento",
     paymentMethod: "Transferencia" as PaymentMethod,
     salePrice: "",
-    startDate: "2026-07-04",
+    startDate: new Date().toISOString().slice(0, 10),
     status: "Relevamiento" as ProjectStatus
   });
 
@@ -57,19 +56,20 @@ export function NewProjectForm() {
   }
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Nuevo proyecto"
-        title="Crear una base simple y completarla de a poco."
-        description="Este flujo crea cliente y proyecto en Supabase para continuar editandolo desde el detalle."
-      />
-
-      <section className="panel-block form-shell">
-        <div className="block-heading">
-          <span className="eyebrow">Datos iniciales</span>
-          <span>Supabase</span>
+    <section className="executive-page new-project-command">
+      <header className="command-header">
+        <div>
+          <h1>Nuevo Proyecto</h1>
+          <p>Crear una base simple con cliente y datos comerciales, y completarla de a poco desde el detalle.</p>
         </div>
+      </header>
 
+      <article className="finance-drawer">
+        <header>
+          <span className="eyebrow">Datos iniciales</span>
+          <strong>{feedback}</strong>
+        </header>
+        <div className="finance-form compact">
         <div className="field-grid form-grid-wide">
           <label className="field">
             <span>Nombre del proyecto</span>
@@ -132,11 +132,13 @@ export function NewProjectForm() {
           </label>
         </div>
 
-        <p className="form-feedback">{feedback}</p>
-        <button className="command-button form-submit" disabled={isPending} type="button" onClick={createProject}>
-          {isPending ? "Creando" : "Crear proyecto"}
-        </button>
-      </section>
-    </>
+        <div className="quick-note-actions">
+          <button className="command-primary" disabled={isPending} type="button" onClick={createProject}>
+            {isPending ? "Creando…" : "Crear proyecto"}
+          </button>
+        </div>
+        </div>
+      </article>
+    </section>
   );
 }

@@ -107,6 +107,18 @@ export type CashMovement = {
   notes: string;
 };
 
+export type IdeaUrgency = "baja" | "media" | "alta" | "urgente";
+
+export type Idea = {
+  id: string;
+  title: string;
+  kind: string;
+  body: string;
+  need: string;
+  urgency: IdeaUrgency;
+  createdAt: string;
+};
+
 export type PartnerProfile = {
   id: string;
   name: string;

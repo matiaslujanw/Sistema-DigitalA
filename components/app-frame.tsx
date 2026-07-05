@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { Route } from "next";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { signOutAction } from "@/app/actions/auth";
 
 const routes = [
   { href: "/dashboard", label: "Overview", icon: "overview" },
@@ -30,7 +31,7 @@ const routeMeta = [
   { match: "/ajustes", eyebrow: "Configuracion" }
 ];
 
-export function AppFrame({ children }: { children: ReactNode }) {
+export function AppFrame({ children, userEmail }: { children: ReactNode; userEmail?: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -78,8 +79,8 @@ export function AppFrame({ children }: { children: ReactNode }) {
         <div className="rail-status">
           <div className="rail-user-avatar" />
           <div className="rail-copy">
-            <strong>J. Arquero</strong>
-            <small>Managing Partner</small>
+            <strong>{userEmail ?? "Invitado"}</strong>
+            <small>Admin</small>
           </div>
         </div>
 
@@ -100,6 +101,11 @@ export function AppFrame({ children }: { children: ReactNode }) {
           >
             <span className={`theme-glyph ${theme === "dark" ? "theme-glyph-sun" : "theme-glyph-moon"}`} aria-hidden="true" />
           </button>
+          <form action={signOutAction}>
+            <button aria-label="Cerrar sesion" className="icon-button logout-button" type="submit">
+              <span className="logout-glyph" aria-hidden="true" />
+            </button>
+          </form>
         </div>
       </aside>
 

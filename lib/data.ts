@@ -3,13 +3,14 @@ import "server-only";
 import { unstable_noStore as noStore } from "next/cache";
 import { cashMovements as mockCashMovements, clients as mockClients, costs as mockCosts, events as mockEvents, partnerProfiles as mockPartnerProfiles, projectPayments as mockProjectPayments, projects as mockProjects } from "@/lib/mock-data";
 import { createSupabaseServerClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import type { CashMovement, Client, Cost, PartnerProfile, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
+import type { CashMovement, Client, Cost, Idea, PartnerProfile, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
 
 type AppData = {
   cashMovements: CashMovement[];
   clients: Client[];
   costs: Cost[];
   events: ProjectEvent[];
+  ideas: Idea[];
   notes: ProjectNote[];
   partnerProfiles: PartnerProfile[];
   payments: ProjectPayment[];
@@ -98,6 +99,16 @@ type DbCost = {
   category: Cost["category"];
 };
 
+type DbIdea = {
+  id: string;
+  title: string;
+  kind: string;
+  body: string;
+  need: string;
+  urgency: Idea["urgency"];
+  created_at: string;
+};
+
 type DbCashMovement = {
   id: string;
   source_project_id: string | null;
@@ -120,6 +131,7 @@ const fallbackData: AppData = {
   clients: mockClients,
   costs: mockCosts,
   events: mockEvents,
+  ideas: [],
   notes: [],
   partnerProfiles: mockPartnerProfiles,
   payments: mockProjectPayments,
@@ -167,7 +179,8 @@ async function getSupabaseData(): Promise<AppData> {
     eventsResult,
     notesResult,
     costsResult,
-    cashMovementsResult
+    cashMovementsResult,
+    ideasResult
   ] = await Promise.all([
     supabase.from("clients").select("*").order("created_at", { ascending: true }),
     supabase.from("partners").select("*").order("created_at", { ascending: true }),
@@ -177,7 +190,8 @@ async function getSupabaseData(): Promise<AppData> {
     supabase.from("project_events").select("*").order("happened_on", { ascending: false }),
     supabase.from("project_notes").select("*").order("happened_on", { ascending: false }),
     supabase.from("costs").select("*").order("created_at", { ascending: false }),
-    supabase.from("cash_movements").select("*").order("happened_on", { ascending: false })
+    supabase.from("cash_movements").select("*").order("happened_on", { ascending: false }),
+    supabase.from("ideas").select("*").order("created_at", { ascending: false })
   ]);
 
   const results = [
@@ -205,6 +219,8 @@ async function getSupabaseData(): Promise<AppData> {
   const dbNotes = (notesResult.data ?? []) as DbNote[];
   const dbCosts = (costsResult.data ?? []) as DbCost[];
   const dbCashMovements = (cashMovementsResult.data ?? []) as DbCashMovement[];
+  // La tabla ideas puede no existir todavia (SQL pendiente de aplicar); no bloquea el resto.
+  const dbIdeas = (ideasResult.error ? [] : (ideasResult.data ?? [])) as DbIdea[];
   const partnerNameById = new Map(dbPartners.map((partner) => [partner.id, partner.name]));
 
   const clients = dbClients.map<Client>((client) => ({
@@ -288,6 +304,15 @@ async function getSupabaseData(): Promise<AppData> {
       projectId: event.project_id,
       title: event.title,
       type: event.type
+    })),
+    ideas: dbIdeas.map<Idea>((idea) => ({
+      id: idea.id,
+      body: idea.body,
+      createdAt: idea.created_at.slice(0, 10),
+      kind: idea.kind,
+      need: idea.need,
+      title: idea.title,
+      urgency: idea.urgency
     })),
     notes: dbNotes.map<ProjectNote>((note) => ({
       id: note.id,

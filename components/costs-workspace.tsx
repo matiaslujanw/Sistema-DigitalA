@@ -1,10 +1,16 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { addCostAction } from "@/app/actions/projects";
 import { money } from "@/lib/format";
 import type { Cost, Project } from "@/lib/types";
 
 const exchangeRate = 1210;
+const categories: Cost["category"][] = ["Infra", "Software", "Dominio", "Marketing", "Operativo"];
 
 export function CostsWorkspace({
-  costs,
+  costs: initialCosts,
   projects,
   source
 }: {
@@ -12,12 +18,93 @@ export function CostsWorkspace({
   projects: Project[];
   source: "mock" | "supabase";
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [costs, setCosts] = useState<Cost[]>(initialCosts);
+  const [showForm, setShowForm] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [draft, setDraft] = useState({
+    amount: "",
+    cadence: "Mensual" as Cost["cadence"],
+    category: "Infra" as Cost["category"],
+    currency: "ARS" as "ARS" | "USD",
+    name: "",
+    projectId: "",
+    provider: ""
+  });
+
   const monthlyCosts = costs.filter((cost) => cost.cadence === "Mensual");
   const monthlyTotal = monthlyCosts.reduce((sum, cost) => sum + normalizeCost(cost), 0);
   const infraTotal = monthlyCosts.filter((cost) => cost.category === "Infra").reduce((sum, cost) => sum + normalizeCost(cost), 0);
   const softwareTotal = monthlyCosts.filter((cost) => cost.category === "Software").reduce((sum, cost) => sum + normalizeCost(cost), 0);
-  const renewalRisk = costs.filter((cost) => cost.cadence === "Mensual" && cost.currency === "USD").length;
+  const usdMonthly = monthlyCosts.filter((cost) => cost.currency === "USD");
   const categoryTotals = getCategoryTotals(costs);
+
+  const alerts = useMemo(() => buildAlerts(costs, projects), [costs, projects]);
+
+  function saveCost() {
+    const amount = Number(draft.amount);
+    if (!draft.name.trim() || !amount || amount <= 0) return;
+
+    const cost: Cost = {
+      id: `local-cost-${Date.now()}`,
+      amount,
+      cadence: draft.cadence,
+      category: draft.category,
+      currency: draft.currency,
+      name: draft.name.trim(),
+      projectId: draft.projectId || null,
+      provider: draft.provider.trim() || "Sin proveedor"
+    };
+
+    if (source !== "supabase") {
+      setCosts((current) => [cost, ...current]);
+      resetDraft();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await addCostAction({
+          amount: cost.amount,
+          cadence: cost.cadence,
+          category: cost.category,
+          currency: cost.currency,
+          name: cost.name,
+          projectId: cost.projectId,
+          provider: cost.provider
+        });
+        setCosts((current) => [cost, ...current]);
+        resetDraft();
+        setFeedback("Costo guardado en Supabase");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo guardar el costo");
+      }
+    });
+  }
+
+  function resetDraft() {
+    setDraft((current) => ({ ...current, amount: "", name: "", provider: "" }));
+    setShowForm(false);
+  }
+
+  function exportCsv() {
+    const header = "Servicio,Proveedor,Categoria,Monto,Moneda,Cadencia,Proyecto";
+    const rows = costs.map((cost) => {
+      const project = projects.find((item) => item.id === cost.projectId);
+      return [cost.name, cost.provider, cost.category, cost.amount, cost.currency, cost.cadence, project?.name ?? "Corporate"]
+        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+        .join(",");
+    });
+    const blob = new Blob([`${header}\n${rows.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `costos-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <section className="executive-page costs-command">
@@ -25,19 +112,79 @@ export function CostsWorkspace({
         <div>
           <span>Admin / Finanzas / Costos recurrentes</span>
           <h1>Gestion de Costos Operativos</h1>
-          <p>Infraestructura, herramientas y servicios externos del Q3 2026.</p>
+          <p>Infraestructura, herramientas y servicios externos.</p>
         </div>
         <div className="finance-actions">
-          <button className="finance-export" type="button">Exportar</button>
-          <button className="command-primary" type="button">+ Nuevo servicio</button>
+          <button className="finance-export" type="button" onClick={exportCsv}>Exportar CSV</button>
+          <button className="command-primary" type="button" onClick={() => setShowForm((current) => !current)}>+ Nuevo servicio</button>
         </div>
       </header>
 
+      {showForm ? (
+        <article className="finance-drawer">
+          <header>
+            <span className="eyebrow">Nuevo servicio o costo</span>
+            <strong>{feedback ?? (source === "supabase" ? "Conectado a Supabase" : "Modo local")}</strong>
+          </header>
+          <div className="finance-form compact">
+            <div className="field-grid">
+              <label className="field">
+                <span>Servicio</span>
+                <input placeholder="Ej: Supabase Pro" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Proveedor</span>
+                <input placeholder="Ej: Supabase" value={draft.provider} onChange={(event) => setDraft((current) => ({ ...current, provider: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Categoria</span>
+                <select value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value as Cost["category"] }))}>
+                  {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="field-grid">
+              <label className="field">
+                <span>Monto</span>
+                <input min="0" type="number" value={draft.amount} onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Moneda</span>
+                <select value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value as "ARS" | "USD" }))}>
+                  <option value="ARS">ARS</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Cadencia</span>
+                <select value={draft.cadence} onChange={(event) => setDraft((current) => ({ ...current, cadence: event.target.value as Cost["cadence"] }))}>
+                  <option value="Mensual">Mensual</option>
+                  <option value="Unico">Unico</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Proyecto (opcional)</span>
+                <select value={draft.projectId} onChange={(event) => setDraft((current) => ({ ...current, projectId: event.target.value }))}>
+                  <option value="">Corporate</option>
+                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="quick-note-actions">
+              <button className="command-primary" disabled={isPending} type="button" onClick={saveCost}>
+                {isPending ? "Guardando…" : "Guardar servicio"}
+              </button>
+              <button className="ghost-button" type="button" onClick={() => setShowForm(false)}>Cancelar</button>
+            </div>
+          </div>
+        </article>
+      ) : null}
+
       <section className="ops-kpis">
-        <OpsKpi label="Gasto mensual total" value={money(monthlyTotal)} note="+2.4% vs mes ant." tone="blue" />
-        <OpsKpi label="Infraestructura & AI" value={money(infraTotal)} note={`${monthlyCosts.length} servicios activos`} tone="orange" />
-        <OpsKpi label="Software operativo" value={money(softwareTotal)} note="-5.0% renovacion" tone="green" />
-        <OpsKpi label="Proxima renovacion" value={nextRenewal(costs)} note={`${renewalRisk} en USD`} tone="neutral" />
+        <OpsKpi label="Gasto mensual total" value={money(monthlyTotal)} note={`${monthlyCosts.length} servicios activos`} tone="blue" />
+        <OpsKpi label="Infraestructura & AI" value={money(infraTotal)} note={`${monthlyCosts.filter((cost) => cost.category === "Infra").length} servicios`} tone="orange" />
+        <OpsKpi label="Software operativo" value={money(softwareTotal)} note={`${monthlyCosts.filter((cost) => cost.category === "Software").length} servicios`} tone="green" />
+        <OpsKpi label="Exposicion USD" value={money(usdMonthly.reduce((sum, cost) => sum + cost.amount, 0), "USD")} note={`${usdMonthly.length} servicios en USD`} tone="neutral" />
       </section>
 
       <section className="ops-table-card">
@@ -45,18 +192,17 @@ export function CostsWorkspace({
           <h2>Desglose de Costos Recurrentes</h2>
           <div>
             <span>{source === "supabase" ? "Supabase" : "Mock"}</span>
-            <button type="button" aria-label="Filtrar costos" />
           </div>
         </header>
         <div className="ops-table-head">
           <span>Servicio / Proveedor</span>
-          <span>Costo mensual</span>
-          <span>Renovacion</span>
+          <span>Costo</span>
+          <span>Cadencia</span>
           <span>Asociado a</span>
           <span>Estado</span>
-          <span>Acciones</span>
+          <span>Equivalente ARS</span>
         </div>
-        {costs.map((cost, index) => {
+        {costs.map((cost) => {
           const project = projects.find((item) => item.id === cost.projectId);
           return (
             <article className="ops-table-row" key={cost.id}>
@@ -68,21 +214,15 @@ export function CostsWorkspace({
                 </div>
               </div>
               <strong>{money(cost.amount, cost.currency)}</strong>
-              <span>{renewalLabel(cost, index)}</span>
+              <span>{cost.cadence}</span>
               <mark>{project?.name ?? "Corporate"}</mark>
               <StatusBadge cost={cost} />
-              <button className="ops-more" type="button" aria-label={`Acciones para ${cost.name}`}>...</button>
+              <span>{cost.currency === "USD" ? money(cost.amount * exchangeRate) : "—"}</span>
             </article>
           );
         })}
         <footer>
-          <span>Mostrando 1-{costs.length} de {costs.length} servicios</span>
-          <div className="pager">
-            <button type="button">{"<"}</button>
-            <button className="active" type="button">1</button>
-            <button type="button">2</button>
-            <button type="button">{">"}</button>
-          </div>
+          <span>{costs.length} {costs.length === 1 ? "servicio" : "servicios"} registrados</span>
         </footer>
       </section>
 
@@ -90,7 +230,6 @@ export function CostsWorkspace({
         <article className="category-card">
           <header>
             <h2>Distribucion de Gasto por Categoria</h2>
-            <button type="button" aria-label="Expandir grafico" />
           </header>
           <div className="category-chart">
             {categoryTotals.map((item) => (
@@ -104,10 +243,14 @@ export function CostsWorkspace({
 
         <aside className="alerts-card">
           <h2>Alertas Financieras</h2>
-          <Alert tone="red" title="Renovacion critica" detail="Hostinger expira pronto. Validar si continua o se migra." />
-          <Alert tone="orange" title="Limite de APIs" detail="WhatsApp API puede crecer si suben automatizaciones CRM." />
-          <Alert tone="green" title="Optimizacion detectada" detail="Supabase y Vercel podrian consolidarse por proyecto." />
-          <button type="button">Ver todas las alertas</button>
+          {alerts.length > 0 ? (
+            alerts.map((alert) => <Alert detail={alert.detail} key={alert.title} title={alert.title} tone={alert.tone} />)
+          ) : (
+            <div className="ops-alert green">
+              <strong>Sin alertas</strong>
+              <span>Los costos estan bajo control.</span>
+            </div>
+          )}
         </aside>
       </section>
     </section>
@@ -126,8 +269,8 @@ function OpsKpi({ label, note, tone, value }: { label: string; note: string; ton
 }
 
 function StatusBadge({ cost }: { cost: Cost }) {
-  const label = cost.cadence === "Unico" ? "Pagado" : cost.currency === "USD" ? "Activo" : "En curso";
-  const tone = cost.cadence === "Unico" ? "neutral" : cost.currency === "USD" ? "green" : "blue";
+  const label = cost.cadence === "Unico" ? "Pagado" : "Activo";
+  const tone = cost.cadence === "Unico" ? "neutral" : "green";
   return <b className={`ops-status ${tone}`}>{label}</b>;
 }
 
@@ -138,6 +281,49 @@ function Alert({ detail, title, tone }: { detail: string; title: string; tone: "
       <span>{detail}</span>
     </div>
   );
+}
+
+function buildAlerts(costs: Cost[], projects: Project[]) {
+  const alerts: Array<{ detail: string; title: string; tone: "green" | "orange" | "red" }> = [];
+  const monthly = costs.filter((cost) => cost.cadence === "Mensual");
+
+  const heaviest = [...monthly].sort((a, b) => normalizeCost(b) - normalizeCost(a))[0];
+  if (heaviest) {
+    alerts.push({
+      detail: `${heaviest.name} (${heaviest.provider}) representa ${money(normalizeCost(heaviest))} por mes.`,
+      title: "Costo mas pesado",
+      tone: "orange"
+    });
+  }
+
+  const usdCount = monthly.filter((cost) => cost.currency === "USD").length;
+  if (usdCount > 0) {
+    alerts.push({
+      detail: `${usdCount} ${usdCount === 1 ? "servicio mensual esta dolarizado" : "servicios mensuales estan dolarizados"}; revisar impacto ante saltos de tipo de cambio.`,
+      title: "Exposicion cambiaria",
+      tone: usdCount > 2 ? "red" : "orange"
+    });
+  }
+
+  const orphanCosts = costs.filter((cost) => cost.projectId && !projects.some((project) => project.id === cost.projectId));
+  if (orphanCosts.length > 0) {
+    alerts.push({
+      detail: `${orphanCosts.length} ${orphanCosts.length === 1 ? "costo apunta" : "costos apuntan"} a proyectos que ya no existen.`,
+      title: "Costos huerfanos",
+      tone: "red"
+    });
+  }
+
+  const corporate = monthly.filter((cost) => !cost.projectId);
+  if (corporate.length > 0) {
+    alerts.push({
+      detail: `${money(corporate.reduce((sum, cost) => sum + normalizeCost(cost), 0))} mensuales no estan asignados a ningun proyecto.`,
+      title: "Gasto corporativo",
+      tone: "green"
+    });
+  }
+
+  return alerts.slice(0, 3);
 }
 
 function normalizeCost(cost: Cost) {
@@ -151,15 +337,4 @@ function getCategoryTotals(costs: Cost[]) {
   }, {});
   const max = Math.max(...Object.values(totals), 1);
   return Object.entries(totals).map(([label, value]) => ({ label, percent: Math.max(8, Math.round((value / max) * 100)) }));
-}
-
-function nextRenewal(costs: Cost[]) {
-  const firstMonthly = costs.find((cost) => cost.cadence === "Mensual");
-  return firstMonthly ? `${firstMonthly.provider} (12 Sep)` : "Sin renovaciones";
-}
-
-function renewalLabel(cost: Cost, index: number) {
-  if (cost.cadence === "Unico") return "Unico";
-  const days = ["12 Sep 2026", "22 Oct 2026", "01 Oct 2026", "15 Oct 2026", "30 Oct 2026"];
-  return days[index % days.length];
 }

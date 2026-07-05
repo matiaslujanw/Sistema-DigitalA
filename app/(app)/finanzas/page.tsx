@@ -7,5 +7,13 @@ export default async function FinancePage() {
   const metrics = getOverviewMetrics(data);
   const projectNames = Object.fromEntries(data.projects.map((project) => [project.id, project.name]));
 
-  return <FinanceWorkspace initialMovements={data.cashMovements} metrics={metrics} projectNames={projectNames} source={data.source} />;
+  return (
+    <FinanceWorkspace
+      initialMovements={data.cashMovements}
+      metrics={metrics}
+      partnerNames={data.partnerProfiles.filter((partner) => partner.status === "Activo").map((partner) => partner.name)}
+      projectNames={projectNames}
+      source={data.source}
+    />
+  );
 }

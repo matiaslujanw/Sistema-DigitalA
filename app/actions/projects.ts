@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { partnerProfiles } from "@/lib/mock-data";
-import type { CashMovement, PaymentMethod, Project, ProjectNote, ProjectStatus } from "@/lib/types";
+import type { CashMovement, Cost, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectStatus } from "@/lib/types";
 
 type CreateProjectInput = {
   clientContact: string;
@@ -47,6 +47,26 @@ type AddNoteInput = {
   projectId: string;
   title: string;
   type: ProjectNote["type"];
+};
+
+type AddEventInput = {
+  date: string;
+  hours: number;
+  notes: string;
+  owner: string;
+  projectId: string;
+  title: string;
+  type: ProjectEvent["type"];
+};
+
+type AddCostInput = {
+  amount: number;
+  cadence: Cost["cadence"];
+  category: Cost["category"];
+  currency: "ARS" | "USD";
+  name: string;
+  projectId?: string | null;
+  provider: string;
 };
 
 type AddCashMovementInput = {
@@ -181,6 +201,44 @@ export async function addProjectNoteAction(input: AddNoteInput) {
   if (eventError) throw new Error(eventError.message);
 
   revalidateProjectPaths(input.projectId);
+}
+
+export async function addProjectEventAction(input: AddEventInput) {
+  const supabase = createSupabaseServerClient();
+  const ownerId = await findOrCreatePartner(input.owner);
+
+  const { error } = await supabase.from("project_events").insert({
+    happened_on: input.date,
+    hours: input.hours,
+    notes: input.notes,
+    owner_partner_id: ownerId,
+    project_id: input.projectId,
+    title: input.title,
+    type: input.type
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidateProjectPaths(input.projectId);
+  revalidatePath("/reuniones");
+}
+
+export async function addCostAction(input: AddCostInput) {
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase.from("costs").insert({
+    amount: input.amount,
+    cadence: input.cadence,
+    category: input.category,
+    currency: input.currency,
+    name: input.name,
+    project_id: input.projectId ?? null,
+    provider: input.provider || "Sin proveedor"
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/costos");
+  revalidatePath("/dashboard");
 }
 
 export async function addCashMovementAction(input: AddCashMovementInput) {

@@ -1,59 +1,20 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { createIdeaAction, deleteIdeaAction, updateIdeaAction } from "@/app/actions/ideas";
 import { localKeys } from "@/lib/local-keys";
+import type { Idea, IdeaUrgency } from "@/lib/types";
 
-type NoteUrgency = "baja" | "media" | "alta" | "urgente";
-
-type IdeaNote = {
-  id: string;
-  title: string;
-  kind: string;
-  body: string;
-  need: string;
-  urgency: NoteUrgency;
-  createdAt: string;
-};
-
-const urgencies: Array<{ label: string; value: NoteUrgency }> = [
+const urgencies: Array<{ label: string; value: IdeaUrgency }> = [
   { label: "Baja", value: "baja" },
   { label: "Media", value: "media" },
   { label: "Alta", value: "alta" },
   { label: "Urgente", value: "urgente" }
 ];
 
-const initialNotes: IdeaNote[] = [
-  {
-    id: "note-portal",
-    title: "Portal para clientes",
-    kind: "Idea",
-    body: "Que el cliente pueda ver avance, documentos y pendientes sin tener que pedir estado por WhatsApp.",
-    need: "Pensar alcance MVP",
-    urgency: "media",
-    createdAt: "2026-07-04"
-  },
-  {
-    id: "note-lead",
-    title: "Lead dashboard comercial",
-    kind: "Posible proyecto",
-    body: "Hay interes, pero falta entender que datos tienen y si quieren algo operativo o solo reportes.",
-    need: "Coordinar reunion",
-    urgency: "alta",
-    createdAt: "2026-07-04"
-  },
-  {
-    id: "note-stock",
-    title: "Producto stock + caja",
-    kind: "Producto propio",
-    body: "Puede repetirse en varios comercios chicos. Anotar preguntas antes de convertirlo en proyecto.",
-    need: "Validar precio",
-    urgency: "baja",
-    createdAt: "2026-07-04"
-  }
-];
-
-const emptyDraft: Omit<IdeaNote, "id" | "createdAt"> = {
+const emptyDraft: Omit<Idea, "id" | "createdAt"> = {
   body: "",
   kind: "Idea",
   need: "",
@@ -61,27 +22,40 @@ const emptyDraft: Omit<IdeaNote, "id" | "createdAt"> = {
   urgency: "media"
 };
 
-export function IdeasWorkspace() {
-  const [notes, setNotes] = useState<IdeaNote[]>(initialNotes);
+export function IdeasWorkspace({
+  initialIdeas,
+  source
+}: {
+  initialIdeas: Idea[];
+  source: "mock" | "supabase";
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [notes, setNotes] = useState<Idea[]>(initialIdeas);
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const isLocal = source !== "supabase";
 
+  // Modo local: cargar y persistir en localStorage (comportamiento previo).
   useEffect(() => {
+    if (!isLocal) return;
     const savedNotes = window.localStorage.getItem(localKeys.ideas);
     if (!savedNotes) return;
 
     try {
-      const parsed = JSON.parse(savedNotes) as Array<Partial<IdeaNote> & { note?: string; priority?: string; client?: string; nextAction?: string }>;
+      const parsed = JSON.parse(savedNotes) as Array<Partial<Idea> & { note?: string; priority?: string; client?: string; nextAction?: string }>;
       if (!Array.isArray(parsed)) return;
       setNotes(parsed.map(normalizeNote));
     } catch {
-      setNotes(initialNotes);
+      // se mantienen las iniciales
     }
-  }, []);
+  }, [isLocal]);
 
   useEffect(() => {
+    if (!isLocal) return;
     window.localStorage.setItem(localKeys.ideas, JSON.stringify(notes));
-  }, [notes]);
+  }, [isLocal, notes]);
 
   const metrics = useMemo(() => {
     const urgent = notes.filter((note) => note.urgency === "urgente" || note.urgency === "alta").length;
@@ -93,16 +67,42 @@ export function IdeasWorkspace() {
     event.preventDefault();
     if (!draft.title.trim() && !draft.body.trim()) return;
 
-    const nextNote: IdeaNote = {
-      ...draft,
+    const cleanDraft = {
       body: draft.body.trim(),
-      id: editingId ?? `note-${Date.now()}`,
       kind: draft.kind.trim() || "Nota",
       need: draft.need.trim(),
       title: draft.title.trim() || "Nota sin titulo",
+      urgency: draft.urgency
+    };
+    const nextNote: Idea = {
+      ...cleanDraft,
+      id: editingId ?? `note-${Date.now()}`,
       createdAt: new Date().toISOString().slice(0, 10)
     };
 
+    if (isLocal) {
+      applyNote(nextNote);
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        if (editingId) {
+          await updateIdeaAction(editingId, cleanDraft);
+          applyNote(nextNote);
+        } else {
+          const newId = await createIdeaAction(cleanDraft);
+          applyNote({ ...nextNote, id: newId });
+        }
+        setFeedback(null);
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo guardar la nota");
+      }
+    });
+  }
+
+  function applyNote(nextNote: Idea) {
     setNotes((current) => {
       if (!editingId) return [nextNote, ...current];
       return current.map((note) => (note.id === editingId ? nextNote : note));
@@ -111,7 +111,7 @@ export function IdeasWorkspace() {
     setEditingId(null);
   }
 
-  function editNote(note: IdeaNote) {
+  function editNote(note: Idea) {
     setEditingId(note.id);
     setDraft({
       body: note.body,
@@ -123,11 +123,28 @@ export function IdeasWorkspace() {
   }
 
   function deleteNote(id: string) {
-    setNotes((current) => current.filter((note) => note.id !== id));
-    if (editingId === id) {
-      setEditingId(null);
-      setDraft(emptyDraft);
+    const removeLocally = () => {
+      setNotes((current) => current.filter((note) => note.id !== id));
+      if (editingId === id) {
+        setEditingId(null);
+        setDraft(emptyDraft);
+      }
+    };
+
+    if (isLocal) {
+      removeLocally();
+      return;
     }
+
+    startTransition(async () => {
+      try {
+        await deleteIdeaAction(id);
+        removeLocally();
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar la nota");
+      }
+    });
   }
 
   return (
@@ -137,6 +154,7 @@ export function IdeasWorkspace() {
           <span>Notas / Ideas / Posibles proyectos</span>
           <h1>Tablero de Notas</h1>
           <p>Un lugar simple para dejar pegado lo que aparece: ideas, leads, cosas a pedir y puntos para arrancar despues.</p>
+          {feedback ? <p className="notes-feedback">{feedback}</p> : null}
         </div>
         <div className="notes-metrics">
           <article>
@@ -188,7 +206,9 @@ export function IdeasWorkspace() {
             ))}
           </div>
           <div className="quick-note-actions">
-            <button className="command-primary" type="submit">{editingId ? "Guardar nota" : "+ Pegar nota"}</button>
+            <button className="command-primary" disabled={isPending} type="submit">
+              {isPending ? "Guardando…" : editingId ? "Guardar nota" : "+ Pegar nota"}
+            </button>
             {editingId ? <button className="ghost-button" type="button" onClick={() => { setEditingId(null); setDraft(emptyDraft); }}>Cancelar</button> : null}
           </div>
         </div>
@@ -216,12 +236,18 @@ export function IdeasWorkspace() {
             </footer>
           </article>
         ))}
+        {notes.length === 0 ? (
+          <div className="panel-empty">
+            <strong>Todavia no hay notas.</strong>
+            <span>Pega la primera con el formulario de arriba.</span>
+          </div>
+        ) : null}
       </section>
     </section>
   );
 }
 
-function normalizeNote(note: Partial<IdeaNote> & { note?: string; priority?: string; client?: string; nextAction?: string }): IdeaNote {
+function normalizeNote(note: Partial<Idea> & { note?: string; priority?: string; client?: string; nextAction?: string }): Idea {
   return {
     body: note.body ?? note.note ?? "",
     createdAt: note.createdAt ?? new Date().toISOString().slice(0, 10),
@@ -233,7 +259,7 @@ function normalizeNote(note: Partial<IdeaNote> & { note?: string; priority?: str
   };
 }
 
-function normalizeUrgency(value?: string): NoteUrgency {
+function normalizeUrgency(value?: string): IdeaUrgency {
   const normalized = value?.toLowerCase();
   if (normalized === "alta") return "alta";
   if (normalized === "baja") return "baja";
@@ -241,7 +267,7 @@ function normalizeUrgency(value?: string): NoteUrgency {
   return "media";
 }
 
-function urgencyLabel(value: NoteUrgency) {
+function urgencyLabel(value: IdeaUrgency) {
   if (value === "baja") return "Baja";
   if (value === "alta") return "Alta";
   if (value === "urgente") return "Urgente";

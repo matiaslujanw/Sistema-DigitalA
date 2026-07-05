@@ -129,6 +129,17 @@ create table if not exists public.cash_movements (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.ideas (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  kind text not null default 'Idea',
+  body text not null default '',
+  need text not null default '',
+  urgency text not null default 'media' check (urgency in ('baja', 'media', 'alta', 'urgente')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists projects_client_id_idx on public.projects(client_id);
 create index if not exists project_payments_project_id_idx on public.project_payments(project_id);
 create index if not exists project_events_project_id_idx on public.project_events(project_id);
@@ -146,3 +157,4 @@ alter table public.project_notes enable row level security;
 alter table public.project_payments enable row level security;
 alter table public.costs enable row level security;
 alter table public.cash_movements enable row level security;
+alter table public.ideas enable row level security;

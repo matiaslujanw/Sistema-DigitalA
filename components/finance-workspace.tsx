@@ -8,11 +8,12 @@ import type { CashDestination, CashMovement, FinanceOperation } from "@/lib/type
 
 const operationOptions: FinanceOperation[] = ["Cobro", "Reparto socios", "Compra divisa", "Inversion", "Gasto", "Reserva"];
 const destinations: CashDestination[] = ["Reparto socios", "Reinversion", "Dolares", "Plazo fijo", "Cheques", "Caja"];
-const exchangeRate = 1210;
+const fallbackExchangeRate = 1210;
 
 export function FinanceWorkspace({
   initialMovements,
   metrics,
+  partnerNames,
   projectNames,
   source
 }: {
@@ -25,6 +26,7 @@ export function FinanceWorkspace({
     usdPaid: number;
     usdSold: number;
   };
+  partnerNames: string[];
   projectNames: Record<string, string>;
   source: "mock" | "supabase";
 }) {
@@ -32,12 +34,13 @@ export function FinanceWorkspace({
   const [isPending, startTransition] = useTransition();
   const [movements, setMovements] = useState<CashMovement[]>(initialMovements);
   const [showForm, setShowForm] = useState(false);
+  const [ledgerFilter, setLedgerFilter] = useState("Todos");
   const [feedback, setFeedback] = useState(source === "supabase" ? "Conectado a Supabase" : "Fallback mock");
   const [draft, setDraft] = useState({
     concept: "",
     amount: "",
     currency: "ARS" as "ARS" | "USD",
-    date: "2026-07-03",
+    date: new Date().toISOString().slice(0, 10),
     operation: "Reparto socios" as FinanceOperation,
     acquiredCurrency: "USD" as "USD" | "EUR" | "USDT" | "ARS",
     acquiredAmount: "",
@@ -47,6 +50,13 @@ export function FinanceWorkspace({
     notes: ""
   });
 
+  // Tipo de cambio: del ultimo movimiento real de compra de divisa; si no hay, valor de referencia.
+  const exchangeRate = useMemo(() => {
+    const lastPurchase = movements.find((movement) => movement.operation === "Compra divisa" && movement.exchangeRate);
+    return lastPurchase?.exchangeRate ?? fallbackExchangeRate;
+  }, [movements]);
+  const isReferenceRate = !movements.some((movement) => movement.operation === "Compra divisa" && movement.exchangeRate);
+
   const totals = useMemo(() => {
     const byDestination = destinations.reduce<Record<CashDestination, number>>((acc, destination) => {
       acc[destination] = 0;
@@ -54,7 +64,7 @@ export function FinanceWorkspace({
     }, {} as Record<CashDestination, number>);
 
     for (const movement of movements) {
-      byDestination[movement.destination] += normalizedAmount(movement);
+      byDestination[movement.destination] += normalizedAmount(movement, exchangeRate);
     }
 
     const paidArs = metrics.arsPaid + metrics.usdPaid * exchangeRate;
@@ -66,9 +76,15 @@ export function FinanceWorkspace({
     const monthlyCosts = metrics.monthlyArsCost + metrics.monthlyUsdCost * exchangeRate;
 
     return { allocated, byDestination, companyCash, monthlyCosts, paidArs, pendingArs, soldArs, undecided };
-  }, [metrics, movements]);
+  }, [exchangeRate, metrics, movements]);
 
-  const partnerShare = Math.round((totals.byDestination["Reparto socios"] || 0) / 3);
+  const partnerCount = Math.max(1, partnerNames.length);
+  const partnerShare = Math.round((totals.byDestination["Reparto socios"] || 0) / partnerCount);
+  const lastDistribution = useMemo(
+    () => movements.filter((movement) => movement.operation === "Reparto socios").map((movement) => movement.date).sort().at(-1) ?? null,
+    [movements]
+  );
+  const filteredMovements = ledgerFilter === "Todos" ? movements : movements.filter((movement) => movement.operation === ledgerFilter);
 
   function addMovement() {
     const amount = Number(draft.amount);
@@ -224,10 +240,10 @@ export function FinanceWorkspace({
               <span />
             </div>
             <div className="allocation-floating">
-              <MiniAllocation title="Compra dolares" value={totals.byDestination.Dolares} note="+1.2% MEP" />
-              <MiniAllocation title="Plazo fijo" value={totals.byDestination["Plazo fijo"]} note="TNA estimada" />
-              <MiniAllocation title="Compra cheques" value={totals.byDestination.Cheques} note="Desc. 12% avg" />
-              <MiniAllocation title="Herramientas / SaaS" value={totals.monthlyCosts} note="Recurring" />
+              <MiniAllocation title="Compra dolares" value={totals.byDestination.Dolares} note="Acumulado" />
+              <MiniAllocation title="Plazo fijo" value={totals.byDestination["Plazo fijo"]} note="Invertido" />
+              <MiniAllocation title="Compra cheques" value={totals.byDestination.Cheques} note="Acumulado" />
+              <MiniAllocation title="Herramientas / SaaS" value={totals.monthlyCosts} note="Mensual" />
             </div>
           </div>
           <footer>
@@ -237,11 +253,11 @@ export function FinanceWorkspace({
             </div>
             <div>
               <span>Ultimo reparto</span>
-              <strong>{latestDate(movements, "Reparto socios")}</strong>
+              <strong>{lastDistribution ? dateLabel(lastDistribution) : "—"}</strong>
             </div>
             <div>
               <span>Prox. distribucion</span>
-              <strong>01/08/26</strong>
+              <strong>{lastDistribution ? dateLabel(addMonths(lastDistribution, 3)) : "—"}</strong>
             </div>
           </footer>
         </article>
@@ -249,19 +265,18 @@ export function FinanceWorkspace({
         <aside className="finance-side-stack">
           <article className="partner-distribution">
             <h2>Distribucion socios</h2>
-            {["Matias", "Socio 2", "Socio 3"].map((partner, index) => (
+            {(partnerNames.length > 0 ? partnerNames : ["Sin socios cargados"]).map((partner) => (
               <div className="partner-money-row" key={partner}>
                 <span>{partner.slice(0, 2).toUpperCase()}</span>
                 <strong>{partner}</strong>
                 <b>{money(partnerShare)}</b>
               </div>
             ))}
-            <button type="button">Ver historial completo</button>
           </article>
 
           <article className="exchange-card">
             <span>Tipo de cambio</span>
-            <strong>{exchangeRate.toLocaleString("es-AR")} <small>ARS/USD MEP</small></strong>
+            <strong>{exchangeRate.toLocaleString("es-AR")} <small>ARS/USD {isReferenceRate ? "referencia" : "ultima compra"}</small></strong>
             <div className="exchange-bars" aria-hidden="true">
               <i /><i /><i /><i /><i /><i /><i />
             </div>
@@ -272,11 +287,9 @@ export function FinanceWorkspace({
       <section className="finance-ledger">
         <header>
           <h2>Movimientos recientes</h2>
-          <select aria-label="Filtro de estado" defaultValue="Todos">
-            <option>Todos</option>
-            <option>Reparto socios</option>
-            <option>Inversion</option>
-            <option>Compra divisa</option>
+          <select aria-label="Filtro de operacion" value={ledgerFilter} onChange={(event) => setLedgerFilter(event.target.value)}>
+            <option value="Todos">Todos</option>
+            {operationOptions.map((operation) => <option key={operation} value={operation}>{operation}</option>)}
           </select>
         </header>
         <div className="finance-ledger-head">
@@ -287,7 +300,7 @@ export function FinanceWorkspace({
           <span>Monto</span>
           <span>Detalle</span>
         </div>
-        {movements.map((movement) => (
+        {filteredMovements.map((movement) => (
           <article className="finance-ledger-row" key={movement.id}>
             <div>
               <strong>{movement.concept}</strong>
@@ -336,8 +349,14 @@ function MiniAllocation({ note, title, value }: { note: string; title: string; v
   );
 }
 
-function normalizedAmount(movement: CashMovement) {
+function normalizedAmount(movement: CashMovement, exchangeRate: number) {
   return movement.currency === "USD" ? movement.amount * exchangeRate : movement.amount;
+}
+
+function addMonths(date: string, months: number) {
+  const base = new Date(`${date}T12:00:00`);
+  base.setMonth(base.getMonth() + months);
+  return base.toISOString().slice(0, 10);
 }
 
 function operationToDestination(operation: FinanceOperation): CashMovement["destination"] {
@@ -346,11 +365,6 @@ function operationToDestination(operation: FinanceOperation): CashMovement["dest
   if (operation === "Inversion") return "Plazo fijo";
   if (operation === "Gasto") return "Reinversion";
   return "Caja";
-}
-
-function latestDate(movements: CashMovement[], destination: CashDestination) {
-  const movement = movements.find((item) => item.destination === destination);
-  return movement ? dateLabel(movement.date).replace(" de ", "/").replace(" de ", "/") : "Sin fecha";
 }
 
 function movementDetails(movement: CashMovement) {
