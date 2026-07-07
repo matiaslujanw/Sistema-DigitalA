@@ -6,6 +6,7 @@ import type { Route } from "next";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/actions/auth";
+import { GearIcon, LogOutIcon, MoonIcon, SunIcon } from "@/components/ui-icons";
 
 const routes = [
   { href: "/dashboard", label: "Overview", icon: "overview" },
@@ -56,12 +57,15 @@ export function AppFrame({ children, userEmail }: { children: ReactNode; userEma
   return (
     <main className={`product-shell ${collapsed ? "rail-collapsed" : ""}`}>
       <aside className="rail">
-        <Link className="brand-card" href="/dashboard" aria-label="Digital Amenities">
-          <span className="rail-copy">
-            <strong>Digital Amenities</strong>
-            <small>Executive Suite</small>
-          </span>
-        </Link>
+        <div className="rail-header">
+          <Link className="brand-card" href="/dashboard" aria-label="Digital Amenities">
+            <span className="brand-mark" aria-hidden="true">DA</span>
+            <span className="rail-copy">
+              <strong>Digital Amenities</strong>
+              <small>Executive Suite</small>
+            </span>
+          </Link>
+        </div>
 
         <nav className="route-list" aria-label="Navegacion principal">
           {routes.map((route) => (
@@ -69,9 +73,14 @@ export function AppFrame({ children, userEmail }: { children: ReactNode; userEma
               className={`${pathname.startsWith(route.href) ? "active" : ""} ${route.separated ? "separated" : ""}`}
               href={route.href}
               key={route.href}
+              title={route.label}
             >
-              <span className={`nav-icon nav-icon-${route.icon}`} aria-hidden="true" />
-              <span>{collapsed ? route.label.slice(0, 2) : route.label}</span>
+              {route.icon === "settings" ? (
+                <GearIcon className="nav-svg-icon" />
+              ) : (
+                <span className={`nav-icon nav-icon-${route.icon}`} aria-hidden="true" />
+              )}
+              <span className="route-label">{route.label}</span>
             </Link>
           ))}
         </nav>
@@ -79,33 +88,9 @@ export function AppFrame({ children, userEmail }: { children: ReactNode; userEma
         <div className="rail-status">
           <div className="rail-user-avatar" />
           <div className="rail-copy">
-            <strong>{userEmail ?? "Invitado"}</strong>
+            <strong title={userEmail ?? "Invitado"}>{userEmail ?? "Invitado"}</strong>
             <small>Admin</small>
           </div>
-        </div>
-
-        <div className="rail-controls">
-          <button
-            aria-label={collapsed ? "Mostrar sidebar" : "Ocultar sidebar"}
-            className="icon-button rail-toggle"
-            type="button"
-            onClick={() => setCollapsed((current) => !current)}
-          >
-            <span aria-hidden="true" />
-          </button>
-          <button
-            aria-label={theme === "dark" ? "Activar modo dia" : "Activar modo noche"}
-            className="icon-button theme-button"
-            type="button"
-            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-          >
-            <span className={`theme-glyph ${theme === "dark" ? "theme-glyph-sun" : "theme-glyph-moon"}`} aria-hidden="true" />
-          </button>
-          <form action={signOutAction}>
-            <button aria-label="Cerrar sesion" className="icon-button logout-button" type="submit">
-              <span className="logout-glyph" aria-hidden="true" />
-            </button>
-          </form>
         </div>
       </aside>
 
@@ -120,9 +105,33 @@ export function AppFrame({ children, userEmail }: { children: ReactNode; userEma
               <span aria-hidden="true" />
               <input placeholder="Buscar transaccion o proyecto" />
             </label>
-            <button className="topbar-icon topbar-icon-bell" aria-label="Notificaciones" type="button" />
-            <button className="topbar-icon topbar-icon-wallet" aria-label="Caja" type="button" />
-            <button className="topbar-icon topbar-icon-switch" aria-label="Cambiar vista" type="button" />
+            <div className="suite-control-group">
+              <button
+                aria-label={collapsed ? "Mostrar sidebar" : "Ocultar sidebar"}
+                className="topbar-icon topbar-icon-rail rail-toggle"
+                title={collapsed ? "Mostrar sidebar" : "Ocultar sidebar"}
+                type="button"
+                onClick={() => setCollapsed((current) => !current)}
+              >
+                <span aria-hidden="true" />
+              </button>
+              <button
+                aria-label={theme === "dark" ? "Activar modo dia" : "Activar modo noche"}
+                className="topbar-icon theme-button"
+                title={theme === "dark" ? "Activar modo dia" : "Activar modo noche"}
+                type="button"
+                onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+              >
+                {theme === "dark" ? <SunIcon className="button-icon theme-icon theme-icon-sun" /> : <MoonIcon className="button-icon theme-icon theme-icon-moon" />}
+              </button>
+              {userEmail ? (
+                <form action={signOutAction}>
+                  <button aria-label="Cerrar sesion" className="topbar-icon logout-button" title="Cerrar sesion" type="submit">
+                    <LogOutIcon className="button-icon" />
+                  </button>
+                </form>
+              ) : null}
+            </div>
           </div>
         </header>
         {children}

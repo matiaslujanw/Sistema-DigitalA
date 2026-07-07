@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOutAction } from "@/app/actions/auth";
+import { LogOutIcon, MoonIcon, SunIcon } from "@/components/ui-icons";
 
 export function SettingsWorkspace({
   source,
@@ -50,7 +51,10 @@ export function SettingsWorkspace({
           </p>
           {userEmail ? (
             <form action={signOutAction}>
-              <button className="ghost-button settings-danger" type="submit">Cerrar sesion</button>
+              <button className="ghost-button settings-danger button-with-icon" type="submit">
+                <LogOutIcon className="button-icon" />
+                Cerrar sesion
+              </button>
             </form>
           ) : null}
         </article>
@@ -61,9 +65,11 @@ export function SettingsWorkspace({
             <span>Tema</span>
             <div className="settings-theme-picker" role="radiogroup" aria-label="Tema">
               <button className={theme === "dark" ? "active" : ""} type="button" onClick={() => applyTheme("dark")}>
+                <MoonIcon className="button-icon" />
                 Noche
               </button>
               <button className={theme === "light" ? "active" : ""} type="button" onClick={() => applyTheme("light")}>
+                <SunIcon className="button-icon" />
                 Dia
               </button>
             </div>

@@ -46,25 +46,9 @@ export default async function DashboardPage() {
   const riskProjects = projects.filter((project) => project.status === "Correcciones" || project.status === "Relevamiento").length;
   const healthPercent = activeProjects.length > 0 ? Math.round(((activeProjects.length - riskProjects) / activeProjects.length) * 100) : 100;
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
-  const pendingContracts = projects.filter((project) => !project.contractSigned).length;
 
   return (
     <section className="executive-overview">
-      {pendingContracts > 0 || pending > 0 ? (
-        <article className="executive-alert">
-          <div className="alert-mark">!</div>
-          <div>
-            <strong>Pendientes operativos</strong>
-            <span>
-              {pendingContracts > 0 ? `${pendingContracts} ${pendingContracts === 1 ? "contrato sin firmar" : "contratos sin firmar"}` : ""}
-              {pendingContracts > 0 && pending > 0 ? " · " : ""}
-              {pending > 0 ? `${money(pending)} pendientes de cobro en ${pendingProjects} ${pendingProjects === 1 ? "proyecto" : "proyectos"}` : ""}
-            </span>
-          </div>
-          <Link href="/finanzas">Revisar ahora</Link>
-        </article>
-      ) : null}
-
       <section className="kpi-grid">
         <MetricCard label="Total vendido" value={money(totalSold)} note={`${projects.length} proyectos en cartera`} tone="positive" />
         <MetricCard label="Total cobrado" value={money(totalPaid)} bar={collectedPercent} note={`${collectedPercent}% de lo vendido`} />
