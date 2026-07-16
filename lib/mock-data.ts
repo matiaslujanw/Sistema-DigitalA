@@ -52,6 +52,7 @@ export const projects: Project[] = [
     contractSigned: true,
     contractDate: "2026-05-05",
     startDate: "2026-05-06",
+    dueDate: "2026-08-15",
     nextMilestone: "Modulo de stock y empleados",
     marginTarget: 62,
     partners
@@ -68,6 +69,7 @@ export const projects: Project[] = [
     contractSigned: true,
     contractDate: "2026-04-10",
     startDate: "2026-04-11",
+    dueDate: "2026-07-30",
     nextMilestone: "Capacitacion del equipo",
     marginTarget: 70,
     partners: ["Matias", "Socio 2"]
@@ -84,6 +86,7 @@ export const projects: Project[] = [
     contractSigned: true,
     contractDate: "2026-03-17",
     startDate: "2026-03-18",
+    dueDate: "2026-07-10",
     nextMilestone: "Ajustes de checkout",
     marginTarget: 66,
     partners: ["Socio 2", "Socio 3"]
@@ -100,6 +103,7 @@ export const projects: Project[] = [
     contractSigned: false,
     contractDate: null,
     startDate: "2026-07-01",
+    dueDate: "2026-09-30",
     nextMilestone: "Definir alcance MVP",
     marginTarget: 0,
     partners

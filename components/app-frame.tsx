@@ -11,6 +11,7 @@ import { GearIcon, LogOutIcon, MoonIcon, SunIcon } from "@/components/ui-icons";
 const routes = [
   { href: "/dashboard", label: "Overview", icon: "overview" },
   { href: "/proyectos", label: "Proyectos", icon: "projects" },
+  { href: "/clientes", label: "Clientes", icon: "partners" },
   { href: "/ideas", label: "Ideas", icon: "ideas" },
   { href: "/cronograma", label: "Cronograma", icon: "calendar" },
   { href: "/finanzas", label: "Finanzas", icon: "finance" },
@@ -23,6 +24,7 @@ const routes = [
 const routeMeta = [
   { match: "/dashboard", eyebrow: "Vista general" },
   { match: "/proyectos", eyebrow: "Portfolio de proyectos" },
+  { match: "/clientes", eyebrow: "Cartera de clientes" },
   { match: "/ideas", eyebrow: "Notas e ideas" },
   { match: "/cronograma", eyebrow: "Cronograma maestro" },
   { match: "/finanzas", eyebrow: "Control financiero" },

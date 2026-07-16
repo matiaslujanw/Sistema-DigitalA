@@ -43,12 +43,37 @@ export default async function DashboardPage() {
     .sort((a, b) => b.idleDays - a.idleDays)
     .slice(0, 3);
 
+  // Entregas comprometidas: vencidas primero, luego las mas proximas; sin fecha al final.
+  const upcomingDeliveries = [...activeProjects].sort((a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate.localeCompare(b.dueDate);
+  });
+  const overdueProjects = activeProjects.filter((project) => project.dueDate && project.dueDate < today);
+
   const riskProjects = projects.filter((project) => project.status === "Correcciones" || project.status === "Relevamiento").length;
   const healthPercent = activeProjects.length > 0 ? Math.round(((activeProjects.length - riskProjects) / activeProjects.length) * 100) : 100;
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
 
   return (
     <section className="executive-overview">
+      {overdueProjects.length > 0 ? (
+        <article className="executive-alert">
+          <div className="alert-mark">!</div>
+          <div>
+            <strong>{overdueProjects.length === 1 ? "Entrega vencida" : `${overdueProjects.length} entregas vencidas`}</strong>
+            <span>
+              {overdueProjects
+                .slice(0, 3)
+                .map((project) => `${project.name} (${dateLabel(project.dueDate!)})`)
+                .join(" · ")}
+            </span>
+          </div>
+          <Link href="/proyectos">Revisar ahora</Link>
+        </article>
+      ) : null}
+
       <section className="kpi-grid">
         <MetricCard label="Total vendido" value={money(totalSold)} note={`${projects.length} proyectos en cartera`} tone="positive" />
         <MetricCard label="Total cobrado" value={money(totalPaid)} bar={collectedPercent} note={`${collectedPercent}% de lo vendido`} />
@@ -98,8 +123,12 @@ export default async function DashboardPage() {
             <span className="panel-icon panel-icon-delivery" />
           </div>
           <div className="delivery-list">
-            {activeProjects.slice(0, 3).map((project) => {
-              const idleDays = idleDaysByProject.get(project.id);
+            {upcomingDeliveries.slice(0, 3).map((project) => {
+              const dueInfo = project.dueDate
+                ? project.dueDate < today
+                  ? { label: `Vencido ${daysBetween(project.dueDate, today)} d`, tone: "danger-text" }
+                  : { label: daysBetween(today, project.dueDate) === 0 ? "Vence hoy" : `En ${daysBetween(today, project.dueDate)} d`, tone: daysBetween(today, project.dueDate) <= 7 ? "warn-text" : "" }
+                : { label: "Sin fecha", tone: "" };
               return (
                 <Link className="delivery-card" href={`/proyectos/${project.id}`} key={project.id}>
                   <div>
@@ -107,8 +136,8 @@ export default async function DashboardPage() {
                     <span>{project.name}</span>
                   </div>
                   <div>
-                    <strong>{project.status}</strong>
-                    <span>{idleDays === null || idleDays === undefined ? "Sin actividad" : idleDays === 0 ? "Actividad hoy" : `Hace ${idleDays} d`}</span>
+                    <strong className={dueInfo.tone}>{dueInfo.label}</strong>
+                    <span>{project.dueDate ? dateLabel(project.dueDate) : project.status}</span>
                   </div>
                 </Link>
               );

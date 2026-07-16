@@ -74,6 +74,7 @@ export type Project = {
   contractSigned: boolean;
   contractDate: string | null;
   startDate: string;
+  dueDate: string | null;
   nextMilestone: string;
   marginTarget: number;
   partners: string[];

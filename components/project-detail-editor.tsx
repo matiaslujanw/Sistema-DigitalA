@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { addProjectNoteAction, addProjectPaymentAction, deleteProjectNoteAction, deleteProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
-import type { Client, Idea, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
+import type { Client, Cost, Idea, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
 import { projectStatuses } from "@/lib/project-statuses";
 import { dateLabel, daysBetween, money } from "@/lib/format";
 import { StatusPill } from "./ui";
@@ -19,6 +19,7 @@ const noteTypes: ProjectNote["type"][] = ["Reunion", "Relevamiento", "Decision",
 
 export function ProjectDetailEditor({
   client,
+  costs,
   events,
   ideas,
   initialNotes,
@@ -28,6 +29,7 @@ export function ProjectDetailEditor({
   source
 }: {
   client: Client;
+  costs: Cost[];
   events: ProjectEvent[];
   ideas: Idea[];
   initialNotes: ProjectNote[];
@@ -68,6 +70,16 @@ export function ProjectDetailEditor({
   const firstEvent = sortedEvents[0];
   const lastEvent = sortedEvents[sortedEvents.length - 1];
   const elapsedDays = firstEvent && lastEvent ? daysBetween(firstEvent.date, lastEvent.date) : 0;
+  const totalHours = events.reduce((sum, event) => sum + event.hours, 0);
+
+  // Rentabilidad: cobrado menos costos asociados, normalizado a la moneda del proyecto (TC referencia 1210).
+  const referenceRate = 1210;
+  const projectCosts = costs.reduce((sum, cost) => {
+    if (cost.currency === project.currency) return sum + cost.amount;
+    return sum + (cost.currency === "USD" ? cost.amount * referenceRate : cost.amount / referenceRate);
+  }, 0);
+  const profit = paidAmount - projectCosts;
+  const realMargin = paidAmount > 0 ? Math.round((profit / paidAmount) * 100) : null;
 
   function updateProject<T extends keyof EditableProject>(key: T, value: EditableProject[T]) {
     setProject((current) => ({ ...current, [key]: value }));
@@ -82,6 +94,7 @@ export function ProjectDetailEditor({
           contractDate: project.contractDate,
           contractSigned: project.contractSigned,
           currency: project.currency,
+          dueDate: project.dueDate,
           nextMilestone: project.nextMilestone,
           paymentMethod: project.paymentMethod,
           salePrice: project.salePrice,
@@ -239,12 +252,15 @@ export function ProjectDetailEditor({
       <header className="detail-hero">
         <div>
           <Link href="/proyectos" className="back-link">← Proyectos</Link>
-          <span className="eyebrow">{client.name} · {client.industry}</span>
+          <span className="eyebrow">
+            <Link className="inline-link" href={`/clientes/${client.id}`}>{client.name}</Link> · {client.industry}
+          </span>
           <h1>{project.name}</h1>
           <div className="detail-meta">
             <StatusPill status={project.status} />
             <span>{project.contractSigned ? "Contrato firmado" : "Contrato pendiente"}</span>
             <span>{elapsedDays} dias trazados</span>
+            {project.dueDate ? <DueBadge dueDate={project.dueDate} status={project.status} /> : <span>Sin fecha de entrega definida</span>}
           </div>
         </div>
         <button className="ghost-button" disabled={isPending || source !== "supabase"} type="button" onClick={saveProjectChanges}>
@@ -272,6 +288,15 @@ export function ProjectDetailEditor({
           <label className="field">
             <span>Proximo hito</span>
             <input value={project.nextMilestone} onChange={(event) => updateProject("nextMilestone", event.target.value)} />
+          </label>
+
+          <label className="field">
+            <span>Entrega comprometida</span>
+            <input
+              type="date"
+              value={project.dueDate ?? ""}
+              onChange={(event) => updateProject("dueDate", event.target.value || null)}
+            />
           </label>
 
           <div className="field-grid">
@@ -332,6 +357,31 @@ export function ProjectDetailEditor({
             <div>
               <span>Pendiente</span>
               <strong>{money(balance, project.currency)}</strong>
+            </div>
+          </div>
+          <div className="profit-block">
+            <span className="eyebrow">Rentabilidad</span>
+            <div className="money-split">
+              <div>
+                <span>Costos asociados</span>
+                <strong>{projectCosts > 0 ? money(Math.round(projectCosts), project.currency) : "—"}</strong>
+              </div>
+              <div>
+                <span>Resultado</span>
+                <strong className={profit >= 0 ? "" : "danger-text"}>{money(Math.round(profit), project.currency)}</strong>
+              </div>
+            </div>
+            <div className="money-split">
+              <div>
+                <span>Margen real</span>
+                <strong className={realMargin !== null && realMargin < project.marginTarget ? "warn-text" : ""}>
+                  {realMargin !== null ? `${realMargin}%` : "Sin cobros"}
+                </strong>
+              </div>
+              <div>
+                <span>Objetivo · Horas</span>
+                <strong>{project.marginTarget}% · {Math.round(totalHours)} hs</strong>
+              </div>
             </div>
           </div>
         </article>
@@ -524,5 +574,21 @@ export function ProjectDetailEditor({
         </article>
       </section>
     </section>
+  );
+}
+
+function DueBadge({ dueDate, status }: { dueDate: string; status: ProjectStatus }) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (status === "En uso") {
+    return <span className="due-badge due-ok">Entregado · comprometido {dateLabel(dueDate)}</span>;
+  }
+  if (dueDate < today) {
+    return <span className="due-badge due-late">Vencido hace {daysBetween(dueDate, today)} dias ({dateLabel(dueDate)})</span>;
+  }
+  const remaining = daysBetween(today, dueDate);
+  return (
+    <span className={`due-badge ${remaining <= 7 ? "due-soon" : "due-ok"}`}>
+      Entrega en {remaining} dias ({dateLabel(dueDate)})
+    </span>
   );
 }

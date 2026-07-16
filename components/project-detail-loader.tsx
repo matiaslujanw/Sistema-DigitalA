@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import type { Client, Idea, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
+import type { Client, Cost, Idea, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
 import { ProjectDetailEditor } from "./project-detail-editor";
 
 export function ProjectDetailLoader({
   initialClient,
+  initialCosts,
   initialEvents,
   initialIdeas,
   initialNotes,
@@ -16,6 +17,7 @@ export function ProjectDetailLoader({
   source
 }: {
   initialClient: Client | null;
+  initialCosts: Cost[];
   initialEvents: ProjectEvent[];
   initialIdeas: Idea[];
   initialNotes: ProjectNote[];
@@ -38,6 +40,7 @@ export function ProjectDetailLoader({
   return (
     <ProjectDetailEditor
       client={initialClient}
+      costs={initialCosts}
       events={initialEvents}
       ideas={initialIdeas}
       initialNotes={initialNotes}

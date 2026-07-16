@@ -12,6 +12,7 @@ type CreateProjectInput = {
   clientName: string;
   contractSigned: boolean;
   currency: "ARS" | "USD";
+  dueDate: string | null;
   marginTarget: number;
   name: string;
   nextMilestone: string;
@@ -25,6 +26,7 @@ type UpdateProjectInput = {
   contractDate?: string | null;
   contractSigned?: boolean;
   currency?: "ARS" | "USD";
+  dueDate?: string | null;
   nextMilestone?: string;
   paymentMethod?: PaymentMethod;
   salePrice?: number;
@@ -110,6 +112,7 @@ export async function createProjectAction(input: CreateProjectInput) {
       contract_date: input.contractSigned ? input.startDate : null,
       contract_signed: input.contractSigned,
       currency: input.currency,
+      due_date: input.dueDate,
       margin_target: input.marginTarget,
       name: input.name,
       next_milestone: input.nextMilestone || "Definir proximo hito",
@@ -147,6 +150,7 @@ export async function updateProjectAction(projectId: string, input: UpdateProjec
   if (input.contractDate !== undefined) payload.contract_date = input.contractDate;
   if (input.contractSigned !== undefined) payload.contract_signed = input.contractSigned;
   if (input.currency !== undefined) payload.currency = input.currency;
+  if (input.dueDate !== undefined) payload.due_date = input.dueDate;
   if (input.nextMilestone !== undefined) payload.next_milestone = input.nextMilestone;
   if (input.paymentMethod !== undefined) payload.payment_method = input.paymentMethod;
   if (input.salePrice !== undefined) payload.sale_price = input.salePrice;

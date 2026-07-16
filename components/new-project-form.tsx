@@ -20,6 +20,7 @@ export function NewProjectForm({ initialDetail = "", initialName = "" }: { initi
     clientName: "",
     contractSigned: false,
     currency: "ARS" as "ARS" | "USD",
+    dueDate: "",
     marginTarget: "60",
     name: initialName,
     nextMilestone: initialDetail ? `Validar: ${initialDetail.slice(0, 80)}` : "Primer relevamiento",
@@ -40,6 +41,7 @@ export function NewProjectForm({ initialDetail = "", initialName = "" }: { initi
           clientName: draft.clientName,
           contractSigned: draft.contractSigned,
           currency: draft.currency,
+          dueDate: draft.dueDate || null,
           marginTarget: Number(draft.marginTarget) || 0,
           name: draft.name,
           nextMilestone: draft.nextMilestone,
@@ -123,6 +125,10 @@ export function NewProjectForm({ initialDetail = "", initialName = "" }: { initi
           <label className="field">
             <span>Fecha de inicio</span>
             <input type="date" value={draft.startDate} onChange={(event) => setDraft((current) => ({ ...current, startDate: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Entrega comprometida</span>
+            <input type="date" value={draft.dueDate} onChange={(event) => setDraft((current) => ({ ...current, dueDate: event.target.value }))} />
           </label>
           <label className="field checkbox-field">
             <input

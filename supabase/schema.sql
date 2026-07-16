@@ -52,6 +52,7 @@ create table if not exists public.projects (
   contract_signed boolean not null default false,
   contract_date date,
   start_date date not null default current_date,
+  due_date date,
   next_milestone text not null default 'Definir proximo hito',
   margin_target numeric(5, 2) not null default 0,
   created_at timestamptz not null default now()
@@ -143,6 +144,9 @@ create table if not exists public.ideas (
 
 -- Si la tabla ideas ya existia sin vinculo a proyecto, agregarlo.
 alter table public.ideas add column if not exists project_id uuid references public.projects(id) on delete set null;
+
+-- Fecha comprometida de entrega/fin del proyecto (definida por los socios).
+alter table public.projects add column if not exists due_date date;
 
 create index if not exists ideas_project_id_idx on public.ideas(project_id);
 create index if not exists projects_client_id_idx on public.projects(client_id);

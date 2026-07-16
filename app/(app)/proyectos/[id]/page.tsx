@@ -8,6 +8,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   return (
     <ProjectDetailLoader
       initialClient={detail.client}
+      initialCosts={detail.costs}
       initialEvents={detail.events}
       initialIdeas={detail.ideas}
       initialNotes={detail.notes}

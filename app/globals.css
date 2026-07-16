@@ -5041,6 +5041,143 @@ body {
   opacity: 1;
 }
 
+.warn-text {
+  color: var(--amber);
+}
+
+.profit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* Clientes */
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.client-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-bg);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.client-card:hover {
+  border-color: color-mix(in srgb, var(--blue) 55%, transparent);
+  transform: translateY(-1px);
+}
+
+.client-card header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.client-card header strong {
+  display: block;
+  font-size: 14px;
+}
+
+.client-card header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.client-card mark {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.client-card mark.client-active {
+  border-color: color-mix(in srgb, var(--blue) 55%, transparent);
+  color: var(--blue);
+}
+
+.client-card-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.client-card-stats span {
+  display: block;
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
+.client-card-stats strong {
+  font-size: 13px;
+}
+
+.client-detail-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.client-detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.client-project-row {
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.client-project-row:hover strong {
+  color: var(--blue);
+}
+
+@media (max-width: 980px) {
+  .client-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.due-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.due-badge.due-late {
+  border-color: color-mix(in srgb, var(--pink) 55%, transparent);
+  color: var(--pink);
+}
+
+.due-badge.due-soon {
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  color: var(--amber);
+}
+
+.due-badge.due-ok {
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+  color: var(--blue);
+}
+
 .inline-link {
   color: var(--blue);
   text-decoration: none;

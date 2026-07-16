@@ -47,6 +47,7 @@ type DbProject = {
   contract_signed: boolean;
   contract_date: string | null;
   start_date: string;
+  due_date: string | null;
   next_milestone: string | null;
   margin_target: number | string;
 };
@@ -161,6 +162,7 @@ export async function getProjectDetail(projectId: string) {
 
   return {
     client,
+    costs: data.costs.filter((cost) => cost.projectId === projectId),
     events: data.events.filter((event) => event.projectId === projectId),
     ideas: data.ideas.filter((idea) => idea.projectId === projectId),
     notes: data.notes.filter((note) => note.projectId === projectId),
@@ -258,6 +260,7 @@ async function getSupabaseData(): Promise<AppData> {
       contractDate: project.contract_date,
       contractSigned: project.contract_signed,
       currency: project.currency,
+      dueDate: project.due_date,
       marginTarget: toNumber(project.margin_target),
       name: project.name,
       nextMilestone: project.next_milestone ?? "Definir proximo hito",

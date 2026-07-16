@@ -134,7 +134,7 @@ export function ProjectsWorkspace({
               <div className={`money-cell ${pendingAmount > 0 ? "pending" : ""}`}>{money(pendingAmount, project.currency)}</div>
               <div className="margin-cell">{project.marginTarget}%</div>
               <div className="delivery-cell">
-                <strong>{deliveryLabel(project.status)}</strong>
+                <strong className={dueTone(project)}>{dueLabel(project)}</strong>
                 <span>{trackedHours} h</span>
               </div>
             </Link>
@@ -212,9 +212,23 @@ function stateLabel(status: Project["status"]) {
   return status;
 }
 
-function deliveryLabel(status: Project["status"]) {
-  if (status === "En uso") return "Final";
-  if (status === "MVP entregado") return "Entrega";
-  if (status === "Implementacion") return "Impl.";
-  return "Activo";
+function remainingDays(dueDate: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  return Math.round((new Date(`${dueDate}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 86400000);
+}
+
+function dueLabel(project: Project) {
+  if (project.status === "En uso") return "Entregado";
+  if (!project.dueDate) return "Sin fecha";
+  const days = remainingDays(project.dueDate);
+  if (days < 0) return `Vencido ${-days} d`;
+  if (days === 0) return "Vence hoy";
+  return `En ${days} d`;
+}
+
+function dueTone(project: Project) {
+  if (project.status === "En uso" || !project.dueDate) return "";
+  const days = remainingDays(project.dueDate);
+  if (days < 0) return "danger-text";
+  return days <= 7 ? "warn-text" : "";
 }
