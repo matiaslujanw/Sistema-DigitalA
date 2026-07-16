@@ -162,6 +162,51 @@ export async function updateProjectAction(projectId: string, input: UpdateProjec
   revalidateProjectPaths(projectId);
 }
 
+// Borra el proyecto entero. La FK hace el trabajo pesado:
+// pagos, eventos, notas y project_partners caen por `on delete cascade`;
+// costos, movimientos de caja e ideas quedan con project_id en null
+// (se conservan, solo se desvinculan).
+// El cliente se borra solo si se queda sin proyectos: createProjectAction
+// inserta un cliente nuevo por cada proyecto, así que si no lo limpiamos
+// /clientes se llena de clientes fantasma sin nada colgando.
+export async function deleteProjectAction(projectId: string) {
+  await requireAuthenticatedAction();
+  const supabase = createSupabaseServerClient();
+
+  const { data: project, error: fetchError } = await supabase
+    .from("projects")
+    .select("client_id,name")
+    .eq("id", projectId)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const { error } = await supabase.from("projects").delete().eq("id", projectId);
+  if (error) throw new Error(error.message);
+
+  const { data: siblings, error: siblingsError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("client_id", project.client_id)
+    .limit(1);
+  if (siblingsError) throw new Error(siblingsError.message);
+
+  let removedClient = false;
+  if (!siblings || siblings.length === 0) {
+    const { error: clientError } = await supabase.from("clients").delete().eq("id", project.client_id);
+    // El cliente huérfano no es fatal: el proyecto ya se borró y esa era la intención.
+    if (!clientError) removedClient = true;
+  }
+
+  revalidateProjectPaths(projectId);
+  revalidatePath("/clientes");
+  revalidatePath("/finanzas");
+  revalidatePath("/costos");
+  revalidatePath("/ideas");
+  revalidatePath("/reuniones");
+
+  return { name: project.name as string, removedClient };
+}
+
 export async function addProjectPaymentAction(input: AddPaymentInput) {
   await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();

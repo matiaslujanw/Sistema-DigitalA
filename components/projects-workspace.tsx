@@ -56,7 +56,10 @@ export function ProjectsWorkspace({
   const avgMargin = activeProjects.length > 0 ? Math.round(activeProjects.reduce((sum, project) => sum + project.marginTarget, 0) / activeProjects.length) : 0;
   const riskProjects = projects.filter((project) => project.status === "Correcciones" || project.status === "Relevamiento").length;
   const trackedHours = events.reduce((sum, event) => sum + event.hours, 0);
-  const deliveredProjects = projects.filter((project) => project.status === "En uso" || project.status === "MVP entregado").length;
+  // Entregas: solo cuentan los proyectos que siguen abiertos. Uno "En uso" ya se entrego.
+  const withDueDate = activeProjects.filter((project) => project.dueDate).length;
+  const missingDueDate = activeProjects.length - withDueDate;
+  const overdue = activeProjects.filter((project) => project.dueDate && remainingDays(project.dueDate) < 0).length;
 
   return (
     <section className="executive-page projects-command">
@@ -112,14 +115,14 @@ export function ProjectsWorkspace({
           <span>Entrega</span>
         </div>
         <div className="project-ledger-body">
-          {filteredProjects.map(({ client, paidAmount, paidPercent, pendingAmount, project, trackedHours }, index) => (
+          {filteredProjects.map(({ client, paidAmount, paidPercent, pendingAmount, project, trackedHours }) => (
             <Link className="project-ledger-row" href={`/proyectos/${project.id}` as Route} key={project.id}>
-              <div className={`project-name-cell stripe-${riskTone(project.status, index)}`}>
+              <div className={`project-name-cell stripe-${riskTone(project.status)}`}>
                 <strong>{project.name}</strong>
                 <span>{client?.name ?? "Cliente"} · {client?.industry ?? "Sin rubro"}</span>
               </div>
               <div>
-                <mark className={`project-state ${riskTone(project.status, index)}`}>{stateLabel(project.status)}</mark>
+                <mark className={`project-state ${riskTone(project.status)}`}>{project.status}</mark>
               </div>
               <div className="partner-cell">
                 <span className="partner-dot" />
@@ -142,30 +145,30 @@ export function ProjectsWorkspace({
         </div>
         <footer className="project-ledger-footer">
           <span>Mostrando {filteredProjects.length} de {projects.length} proyectos · {source === "supabase" ? "Supabase" : "Mock"}</span>
-          <div className="pager">
-            <button type="button">{"<"}</button>
-            <button className="active" type="button">1</button>
-            <button type="button">2</button>
-            <button type="button">{">"}</button>
-          </div>
         </footer>
       </section>
 
       <section className="project-command-bottom">
         <article className="command-analysis-card">
           <header>
-            <h2>Analisis de entrega</h2>
-            <span>+12</span>
+            <h2>Entregas comprometidas</h2>
+            <span>{withDueDate} de {activeProjects.length}</span>
           </header>
           <div className="analysis-row">
-            <span>Eficiencia de plazos</span>
-            <strong>+12%</strong>
+            <span>Sin fecha de entrega</span>
+            <strong className={missingDueDate > 0 ? "warn-text" : ""}>{missingDueDate}</strong>
+          </div>
+          <div className="analysis-row">
+            <span>Vencidas</span>
+            <strong className={overdue > 0 ? "danger-text" : ""}>{overdue}</strong>
           </div>
           <div className="analysis-row">
             <span>Horas trazadas</span>
             <strong>{trackedHours} h</strong>
           </div>
-          <div className="analysis-meter"><i style={{ width: `${Math.min(100, deliveredProjects * 24)}%` }} /></div>
+          <div className="analysis-meter">
+            <i style={{ width: `${activeProjects.length > 0 ? Math.round((withDueDate / activeProjects.length) * 100) : 0}%` }} />
+          </div>
         </article>
 
         <article className="command-analysis-card">
@@ -179,7 +182,7 @@ export function ProjectsWorkspace({
               <strong>{money(enrichedProjects.reduce((sum, item) => sum + item.paidAmount, 0))}</strong>
             </div>
             <div>
-              <span>Proyeccion</span>
+              <span>Pendiente</span>
               <strong>{money(totalPending)}</strong>
             </div>
           </div>
@@ -198,18 +201,14 @@ function KpiCard({ label, tone, value }: { label: string; tone: "blue" | "green"
   );
 }
 
-function riskTone(status: Project["status"], index: number) {
+// El tono sale del estado y de nada mas. Antes dependia del indice de la fila
+// (index % 4), asi que el mismo proyecto cambiaba de color al filtrar la tabla.
+function riskTone(status: Project["status"]) {
   if (status === "Correcciones") return "critical";
   if (status === "Relevamiento") return "paused";
   if (status === "En uso") return "neutral";
-  return index % 4 === 0 ? "blue" : "active";
-}
-
-function stateLabel(status: Project["status"]) {
-  if (status === "En desarrollo") return "Activo";
-  if (status === "Correcciones") return "Critico";
-  if (status === "Relevamiento") return "En pausa";
-  return status;
+  if (status === "MVP entregado" || status === "Implementacion") return "blue";
+  return "active";
 }
 
 function remainingDays(dueDate: string) {
@@ -219,7 +218,7 @@ function remainingDays(dueDate: string) {
 
 function dueLabel(project: Project) {
   if (project.status === "En uso") return "Entregado";
-  if (!project.dueDate) return "Sin fecha";
+  if (!project.dueDate) return "Definir fecha";
   const days = remainingDays(project.dueDate);
   if (days < 0) return `Vencido ${-days} d`;
   if (days === 0) return "Vence hoy";
@@ -227,7 +226,9 @@ function dueLabel(project: Project) {
 }
 
 function dueTone(project: Project) {
-  if (project.status === "En uso" || !project.dueDate) return "";
+  if (project.status === "En uso") return "";
+  // Sin fecha no es neutro: es un dato que falta y hay que ir a cargar.
+  if (!project.dueDate) return "muted-text";
   const days = remainingDays(project.dueDate);
   if (days < 0) return "danger-text";
   return days <= 7 ? "warn-text" : "";

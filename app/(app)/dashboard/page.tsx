@@ -128,7 +128,7 @@ export default async function DashboardPage() {
                 ? project.dueDate < today
                   ? { label: `Vencido ${daysBetween(project.dueDate, today)} d`, tone: "danger-text" }
                   : { label: daysBetween(today, project.dueDate) === 0 ? "Vence hoy" : `En ${daysBetween(today, project.dueDate)} d`, tone: daysBetween(today, project.dueDate) <= 7 ? "warn-text" : "" }
-                : { label: "Sin fecha", tone: "" };
+                : { label: "Definir fecha", tone: "muted-text" };
               return (
                 <Link className="delivery-card" href={`/proyectos/${project.id}`} key={project.id}>
                   <div>

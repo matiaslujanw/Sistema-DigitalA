@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addProjectNoteAction, addProjectPaymentAction, deleteProjectNoteAction, deleteProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
+import { addProjectNoteAction, addProjectPaymentAction, deleteProjectAction, deleteProjectNoteAction, deleteProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
 import type { Client, Cost, Idea, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
 import { projectStatuses } from "@/lib/project-statuses";
 import { dateLabel, daysBetween, money } from "@/lib/format";
@@ -42,7 +42,16 @@ export function ProjectDetailEditor({
   const [isPending, startTransition] = useTransition();
   const [project, setProject] = useState<EditableProject>({ ...initialProject, notes: initialNotes, payments: initialPayments });
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState(source === "supabase" ? "Conectado a Supabase" : "Fallback mock: corre el SQL y seed para persistir");
+  const [feedback, setFeedback] = useState(
+    source === "supabase"
+      ? "Conectado a Supabase"
+      : "Estas viendo datos de ejemplo, no tu base: guardar y borrar estan desactivados porque no habria donde persistirlos."
+  );
+  // Un boton gris sin motivo es peor que un boton que no esta.
+  const readOnly = source !== "supabase";
+  const readOnlyReason = readOnly ? "Desactivado: la app esta con datos de ejemplo, sin conexion a Supabase" : undefined;
+  const [showDeleteProject, setShowDeleteProject] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const today = new Date().toISOString().slice(0, 10);
   const [paymentDraft, setPaymentDraft] = useState({
     amount: "",
@@ -104,6 +113,28 @@ export function ProjectDetailEditor({
         router.refresh();
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "No se pudo guardar el proyecto");
+      }
+    });
+  }
+
+  // Borrar un proyecto se lleva puestos pagos, notas y eventos y no tiene
+  // vuelta atras, asi que pedimos el nombre escrito en vez de un doble click.
+  const deleteArmed = deleteConfirmText.trim() === project.name.trim();
+
+  function deleteProject() {
+    if (!deleteArmed || source !== "supabase") return;
+
+    startTransition(async () => {
+      try {
+        const result = await deleteProjectAction(project.id);
+        router.push("/proyectos");
+        router.refresh();
+        if (result.removedClient) {
+          setFeedback(`Proyecto y cliente ${client.name} eliminados`);
+        }
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar el proyecto");
+        setShowDeleteProject(false);
       }
     });
   }
@@ -260,13 +291,62 @@ export function ProjectDetailEditor({
             <StatusPill status={project.status} />
             <span>{project.contractSigned ? "Contrato firmado" : "Contrato pendiente"}</span>
             <span>{elapsedDays} dias trazados</span>
-            {project.dueDate ? <DueBadge dueDate={project.dueDate} status={project.status} /> : <span>Sin fecha de entrega definida</span>}
+            {project.dueDate ? <DueBadge dueDate={project.dueDate} status={project.status} /> : <span className="muted-text">Entrega sin definir — cargala abajo</span>}
           </div>
         </div>
-        <button className="ghost-button" disabled={isPending || source !== "supabase"} type="button" onClick={saveProjectChanges}>
-          {isPending ? "Guardando" : "Guardar cambios"}
-        </button>
+        <div className="detail-hero-actions">
+          <button className="primary-button" disabled={isPending || readOnly} title={readOnlyReason} type="button" onClick={saveProjectChanges}>
+            {isPending ? "Guardando…" : "Guardar cambios"}
+          </button>
+          <button
+            className="danger-button"
+            disabled={isPending || readOnly}
+            title={readOnlyReason}
+            type="button"
+            onClick={() => {
+              setShowDeleteProject((current) => !current);
+              setDeleteConfirmText("");
+            }}
+          >
+            Borrar proyecto
+          </button>
+          {readOnly ? <span className="readonly-badge" title={readOnlyReason}>Solo lectura</span> : null}
+        </div>
       </header>
+
+      {showDeleteProject ? (
+        <section className="danger-zone" role="group" aria-label="Borrar proyecto">
+          <div>
+            <strong>Borrar “{project.name}” definitivamente</strong>
+            <p>
+              Se borran tambien sus {project.payments.length} pagos, {project.notes.length} notas y {events.length} eventos.
+              Los costos, movimientos de caja e ideas se conservan, pero quedan sin proyecto asignado.
+              {" "}Esto no se puede deshacer.
+            </p>
+          </div>
+          <div className="danger-zone-confirm">
+            <label className="field">
+              <span>Escribi <code>{project.name}</code> para confirmar</span>
+              <input
+                aria-label={`Escribi ${project.name} para confirmar el borrado`}
+                autoComplete="off"
+                placeholder={project.name}
+                value={deleteConfirmText}
+                onChange={(event) => setDeleteConfirmText(event.target.value)}
+              />
+            </label>
+            <div className="danger-zone-buttons">
+              <button className="danger-button" disabled={!deleteArmed || isPending} type="button" onClick={deleteProject}>
+                {isPending ? "Borrando…" : "Borrar para siempre"}
+              </button>
+              <button className="ghost-button" disabled={isPending} type="button" onClick={() => setShowDeleteProject(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <p className="detail-feedback">{feedback}</p>
 
       <section className="detail-grid">

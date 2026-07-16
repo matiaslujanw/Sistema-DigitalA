@@ -37,13 +37,21 @@ const routeMeta = [
 export function AppFrame({ children, userEmail }: { children: ReactNode; userEmail?: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // El script inline de app/layout.tsx ya dejo data-theme puesto antes del
+  // primer pintado. Arrancamos de ahi en vez de asumir "dark" y corregir en
+  // un effect: si no, el effect de abajo pisaba el tema y volvia el flash.
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof document === "undefined") return "dark";
+    return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  });
+  // El icono depende del tema, que en el server no se conoce: renderizarlo
+  // antes de montar seria un mismatch de hidratacion.
+  const [mounted, setMounted] = useState(false);
   const activeMeta = routeMeta.find((route) => pathname.startsWith(route.match)) ?? routeMeta[0];
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem("da-theme");
+    setMounted(true);
     const savedRail = window.localStorage.getItem("da-rail-collapsed");
-    if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
     if (savedRail) setCollapsed(savedRail === "true");
   }, []);
 
@@ -53,8 +61,9 @@ export function AppFrame({ children, userEmail }: { children: ReactNode; userEma
   }, [theme]);
 
   useEffect(() => {
+    if (!mounted) return;
     window.localStorage.setItem("da-rail-collapsed", String(collapsed));
-  }, [collapsed]);
+  }, [collapsed, mounted]);
 
   return (
     <main className={`product-shell ${collapsed ? "rail-collapsed" : ""}`}>
@@ -120,11 +129,16 @@ export function AppFrame({ children, userEmail }: { children: ReactNode; userEma
               <button
                 aria-label={theme === "dark" ? "Activar modo dia" : "Activar modo noche"}
                 className="topbar-icon theme-button"
+                suppressHydrationWarning
                 title={theme === "dark" ? "Activar modo dia" : "Activar modo noche"}
                 type="button"
                 onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
               >
-                {theme === "dark" ? <SunIcon className="button-icon theme-icon theme-icon-sun" /> : <MoonIcon className="button-icon theme-icon theme-icon-moon" />}
+                {mounted ? (
+                  theme === "dark" ? <SunIcon className="button-icon theme-icon theme-icon-sun" /> : <MoonIcon className="button-icon theme-icon theme-icon-moon" />
+                ) : (
+                  <span className="button-icon" aria-hidden="true" />
+                )}
               </button>
               {userEmail ? (
                 <form action={signOutAction}>
