@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAuthServerClient, isSupabaseAuthConfigured, shouldRequireSupabaseAuth } from "@/lib/supabase/auth-server";
-import type { CashMovement, Cost, PaymentMethod, Project, ProjectEvent, ProjectKind, ProjectNote, ProjectStatus } from "@/lib/types";
+import type { AllocationKind, CashMovement, Cost, PaymentMethod, Project, ProjectEvent, ProjectKind, ProjectNote, ProjectStatus } from "@/lib/types";
 
 type CreateProjectInput = {
   kind: ProjectKind;
@@ -76,25 +76,39 @@ type AddCostInput = {
   cadence: Cost["cadence"];
   category: Cost["category"];
   currency: "ARS" | "USD";
+  dueDay?: number | null;
   name: string;
   projectId?: string | null;
   provider: string;
 };
 
-type AddCashMovementInput = {
-  acquiredAmount?: number;
-  acquiredCurrency?: CashMovement["acquiredCurrency"];
-  actualReturnPercent?: number;
+type AddMaintenanceInput = {
   amount: number;
-  concept: string;
+  clientName: string;
   currency: "ARS" | "USD";
+  dueDay: number;
+  notes: string;
+  projectId: string;
+  systemName: string;
+};
+
+type AddAllocationInput = {
+  paymentId: string;
+  parentMovementId: string | null;
+  kind: AllocationKind;
   date: string;
-  destination: CashMovement["destination"];
+  dueDate?: string | null;
+  concept: string;
+  amount: number;
+  currency: "ARS" | "USD";
+  partnerId?: string | null;
+  sourceProjectId?: string | null;
+  acquiredCurrency?: CashMovement["acquiredCurrency"];
+  acquiredAmount?: number;
   exchangeRate?: number;
   expectedReturnPercent?: number;
-  notes: string;
-  operation: CashMovement["operation"];
-  sourceProjectId?: string | null;
+  actualReturnPercent?: number;
+  notes?: string;
 };
 
 export async function createProjectAction(input: CreateProjectInput) {
@@ -255,6 +269,8 @@ export async function addProjectPaymentAction(input: AddPaymentInput) {
 
   await syncProjectPaidAmount(input.projectId);
   revalidateProjectPaths(input.projectId);
+  // El pago es un cobro: aparece en Finanzas como flujo para asignar.
+  revalidatePath("/finanzas");
   return data.id as string;
 }
 
@@ -331,6 +347,7 @@ export async function addCostAction(input: AddCostInput) {
       cadence: input.cadence,
       category: input.category,
       currency: input.currency,
+      due_day: input.cadence === "Mensual" ? input.dueDay ?? 10 : null,
       name: input.name,
       project_id: input.projectId ?? null,
       provider: input.provider || "Sin proveedor"
@@ -345,24 +362,52 @@ export async function addCostAction(input: AddCostInput) {
   return data.id as string;
 }
 
-export async function addCashMovementAction(input: AddCashMovementInput) {
+export async function addMaintenanceAction(input: AddMaintenanceInput) {
+  await requireAuthenticatedAction();
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("maintenance_contracts")
+    .insert({
+      amount: input.amount,
+      client_name: input.clientName || "Cliente",
+      currency: input.currency,
+      due_day: input.dueDay,
+      notes: input.notes,
+      project_id: input.projectId,
+      system_name: input.systemName
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/finanzas");
+  revalidatePath("/mantenimientos");
+  return data.id as string;
+}
+
+export async function addAllocationAction(input: AddAllocationInput) {
   await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("cash_movements")
     .insert({
+      payment_id: input.paymentId,
+      parent_movement_id: input.parentMovementId,
+      partner_id: input.partnerId ?? null,
+      operation: input.kind,
+      happened_on: input.date,
+      due_date: input.dueDate ?? null,
+      concept: input.concept,
+      amount: input.amount,
+      currency: input.currency,
       acquired_amount: input.acquiredAmount,
       acquired_currency: input.acquiredCurrency,
-      actual_return_percent: input.actualReturnPercent,
-      amount: input.amount,
-      concept: input.concept,
-      currency: input.currency,
-      destination: input.destination,
       exchange_rate: input.exchangeRate,
       expected_return_percent: input.expectedReturnPercent,
-      happened_on: input.date,
-      notes: input.notes,
-      operation: input.operation,
+      actual_return_percent: input.actualReturnPercent,
+      notes: input.notes ?? "",
       source_project_id: input.sourceProjectId ?? null
     })
     .select("id")
@@ -386,6 +431,8 @@ export async function deleteProjectPaymentAction(paymentId: string) {
 
   await syncProjectPaidAmount(payment.project_id as string);
   revalidateProjectPaths(payment.project_id as string);
+  // Borrar el cobro se lleva sus asignaciones (FK on delete cascade en cash_movements).
+  revalidatePath("/finanzas");
 }
 
 export async function deleteProjectNoteAction(noteId: string) {
@@ -446,6 +493,32 @@ export async function deleteCashMovementAction(movementId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard");
+  revalidatePath("/finanzas");
+}
+
+export async function markMaintenancePaidAction(maintenanceId: string, monthKey: string) {
+  await requireAuthenticatedAction();
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("maintenance_contracts")
+    .update({ last_paid_month: monthKey })
+    .eq("id", maintenanceId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/finanzas");
+  revalidatePath("/mantenimientos");
+}
+
+export async function markCostPaidAction(costId: string, monthKey: string) {
+  await requireAuthenticatedAction();
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase.from("costs").update({ last_paid_month: monthKey }).eq("id", costId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/costos");
   revalidatePath("/finanzas");
 }
 

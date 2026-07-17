@@ -73,6 +73,7 @@ const projects = [
     contractSigned: true,
     contractDate: "2026-05-05",
     startDate: "2026-05-06",
+    dueDate: "2026-08-15",
     nextMilestone: "Modulo de stock y empleados",
     marginTarget: 62,
     partners
@@ -94,6 +95,7 @@ const projects = [
     contractSigned: true,
     contractDate: "2026-04-10",
     startDate: "2026-04-11",
+    dueDate: "2026-07-30",
     nextMilestone: "Capacitacion del equipo",
     marginTarget: 70,
     partners: ["Matias", "Socio 2"]
@@ -115,6 +117,7 @@ const projects = [
     contractSigned: true,
     contractDate: "2026-03-17",
     startDate: "2026-03-18",
+    dueDate: "2026-07-10",
     nextMilestone: "Ajustes de checkout",
     marginTarget: 66,
     partners: ["Socio 2", "Socio 3"]
@@ -136,6 +139,7 @@ const projects = [
     contractSigned: false,
     contractDate: null,
     startDate: "2026-07-01",
+    dueDate: "2026-09-30",
     nextMilestone: "Definir alcance MVP",
     marginTarget: 0,
     partners
@@ -160,19 +164,22 @@ const events = [
 ];
 
 const costs = [
-  { id: "co1", projectId: null, name: "Supabase Pro", provider: "Supabase", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra" },
-  { id: "co2", projectId: null, name: "Hosting landing", provider: "Hostinger", amount: 10, currency: "USD", cadence: "Mensual", category: "Infra" },
-  { id: "co3", projectId: "p1", name: "WhatsApp API", provider: "Meta", amount: 32000, currency: "ARS", cadence: "Mensual", category: "Software" },
-  { id: "co4", projectId: "p3", name: "Dominio cliente", provider: "NIC", amount: 18000, currency: "ARS", cadence: "Unico", category: "Dominio" },
-  { id: "co5", projectId: null, name: "Vercel", provider: "Vercel", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra" }
+  { id: "co1", projectId: null, name: "Supabase Pro", provider: "Supabase", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra", dueDay: 8, lastPaidMonth: "2026-07" },
+  { id: "co2", projectId: null, name: "Hosting landing", provider: "Hostinger", amount: 10, currency: "USD", cadence: "Mensual", category: "Infra", dueDay: 22, lastPaidMonth: null },
+  { id: "co3", projectId: "p1", name: "WhatsApp API", provider: "Meta", amount: 32000, currency: "ARS", cadence: "Mensual", category: "Software", dueDay: 19, lastPaidMonth: null },
+  { id: "co4", projectId: "p3", name: "Dominio cliente", provider: "NIC", amount: 18000, currency: "ARS", cadence: "Unico", category: "Dominio", dueDay: null, lastPaidMonth: null },
+  { id: "co5", projectId: null, name: "Vercel", provider: "Vercel", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra", dueDay: 25, lastPaidMonth: null }
 ];
 
-const cashMovements = [
-  { id: "m1", sourceProjectId: "p2", date: "2026-05-15", concept: "Cobro final La Vieja Escuela", amount: 600000, currency: "ARS", destination: "Reparto socios", operation: "Reparto socios", notes: "Se dividio en partes iguales." },
-  { id: "m2", sourceProjectId: "p1", date: "2026-06-05", concept: "Anticipo Malala", amount: 450000, currency: "ARS", destination: "Plazo fijo", operation: "Inversion", expectedReturnPercent: 6.8, actualReturnPercent: 6.4, notes: "Se deja inmovilizado hasta segunda entrega." },
-  { id: "m3", sourceProjectId: "p3", date: "2026-06-12", concept: "Pago Bonivibe", amount: 900, currency: "USD", destination: "Caja", operation: "Reserva", notes: "Reserva para costos dolarizados." },
-  { id: "m4", sourceProjectId: null, date: "2026-06-20", concept: "Compra de dolares", amount: 300, currency: "USD", destination: "Dolares", operation: "Compra divisa", acquiredCurrency: "USD", acquiredAmount: 300, exchangeRate: 1210, notes: "Cobertura de caja." }
+const maintenanceContracts = [
+  { id: "m1", projectId: "p2", systemName: "Soporte IA La Vieja Escuela", clientName: "La Vieja Escuela", amount: 180000, currency: "ARS", dueDay: 20, lastPaidMonth: null, active: true, notes: "Mantenimiento mensual, ajustes menores y monitoreo del flujo IA." },
+  { id: "m2", projectId: "p3", systemName: "Mantenimiento tienda Bonivibe", clientName: "Bonivibe", amount: 250, currency: "USD", dueDay: 10, lastPaidMonth: "2026-07", active: true, notes: "Soporte de checkout, stock y deploy." }
 ];
+
+// Los movimientos de finanzas ahora cuelgan de un cobro (payment_id) y forman
+// una cadena; el seed no captura los ids de los pagos, así que se cargan a mano
+// desde la app. Se deja vacío a propósito.
+const cashMovements = [];
 
 await main();
 
@@ -214,6 +221,7 @@ async function main() {
     contract_signed: project.contractSigned,
     currency: project.currency,
     deploy_url: project.deployUrl,
+    due_date: project.dueDate,
     generates_revenue: project.generatesRevenue,
     kind: project.kind,
     margin_target: project.marginTarget,
@@ -264,9 +272,23 @@ async function main() {
     cadence: cost.cadence,
     category: cost.category,
     currency: cost.currency,
+    due_day: cost.dueDay,
+    last_paid_month: cost.lastPaidMonth,
     name: cost.name,
     project_id: cost.projectId ? projectIds.get(cost.projectId) : null,
     provider: cost.provider
+  })));
+
+  await insert("maintenance_contracts", maintenanceContracts.map((maintenance) => ({
+    active: maintenance.active,
+    amount: maintenance.amount,
+    client_name: maintenance.clientName,
+    currency: maintenance.currency,
+    due_day: maintenance.dueDay,
+    last_paid_month: maintenance.lastPaidMonth,
+    notes: maintenance.notes,
+    project_id: projectIds.get(maintenance.projectId),
+    system_name: maintenance.systemName
   })));
 
   await insert("cash_movements", cashMovements.map((movement) => ({

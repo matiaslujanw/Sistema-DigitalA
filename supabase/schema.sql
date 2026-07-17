@@ -112,10 +112,25 @@ create table if not exists public.costs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.maintenance_contracts (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  system_name text not null,
+  client_name text,
+  amount numeric(14, 2) not null default 0,
+  currency text not null check (currency in ('ARS', 'USD')),
+  due_day integer not null default 10 check (due_day >= 1 and due_day <= 31),
+  last_paid_month text,
+  active boolean not null default true,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.cash_movements (
   id uuid primary key default gen_random_uuid(),
   source_project_id uuid references public.projects(id) on delete set null,
   happened_on date not null,
+  due_date date,
   concept text not null,
   amount numeric(14, 2) not null,
   currency text not null check (currency in ('ARS', 'USD')),
@@ -163,6 +178,27 @@ alter table public.projects alter column client_id drop not null;
 create index if not exists projects_kind_idx on public.projects(kind);
 create index if not exists projects_vertical_idx on public.projects(vertical);
 
+-- Finanzas como flujo trazable: cada movimiento es un paso de asignacion que
+-- cuelga de un cobro (payment_id = el pago del proyecto) y, opcional, de otro
+-- paso (parent_movement_id). partner_id es para los repartos a socios.
+alter table public.cash_movements add column if not exists payment_id uuid references public.project_payments(id) on delete cascade;
+alter table public.cash_movements add column if not exists parent_movement_id uuid references public.cash_movements(id) on delete cascade;
+alter table public.cash_movements add column if not exists partner_id uuid references public.partners(id) on delete set null;
+alter table public.cash_movements add column if not exists due_date date;
+-- El destino dejo de usarse (lo reemplaza el tipo de paso en `operation`).
+alter table public.cash_movements alter column destination drop not null;
+create index if not exists cash_movements_payment_id_idx on public.cash_movements(payment_id);
+create index if not exists cash_movements_parent_movement_id_idx on public.cash_movements(parent_movement_id);
+create index if not exists cash_movements_partner_id_idx on public.cash_movements(partner_id);
+
+-- Vencimiento y pago mensual de gastos fijos.
+alter table public.costs add column if not exists due_day integer check (due_day >= 1 and due_day <= 31);
+alter table public.costs add column if not exists last_paid_month text;
+
+-- Cobros recurrentes por mantenimiento de sistemas.
+create index if not exists maintenance_contracts_project_id_idx on public.maintenance_contracts(project_id);
+create index if not exists maintenance_contracts_due_day_idx on public.maintenance_contracts(due_day);
+
 create index if not exists ideas_project_id_idx on public.ideas(project_id);
 create index if not exists projects_client_id_idx on public.projects(client_id);
 create index if not exists project_payments_project_id_idx on public.project_payments(project_id);
@@ -182,3 +218,4 @@ alter table public.project_payments enable row level security;
 alter table public.costs enable row level security;
 alter table public.cash_movements enable row level security;
 alter table public.ideas enable row level security;
+alter table public.maintenance_contracts enable row level security;

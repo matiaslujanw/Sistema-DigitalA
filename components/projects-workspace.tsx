@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useMemo, useState } from "react";
-import { money } from "@/lib/format";
 import type { Client, Project, ProjectEvent, ProjectPayment } from "@/lib/types";
 
 export function ProjectsWorkspace({
@@ -62,11 +61,6 @@ export function ProjectsWorkspace({
   // propio no tiene "precio de venta" y distorsionaria estos numeros.
   const clientProjects = projects.filter((project) => project.kind === "Cliente");
   const ownProjects = projects.filter((project) => project.kind === "Propio");
-  const activeClientProjects = clientProjects.filter((project) => project.status !== "En uso");
-  const arsSold = clientProjects.filter((project) => project.currency === "ARS").reduce((sum, project) => sum + project.salePrice, 0);
-  const usdSold = clientProjects.filter((project) => project.currency === "USD").reduce((sum, project) => sum + project.salePrice, 0);
-  const totalPending = enrichedProjects.filter((item) => item.project.kind === "Cliente").reduce((sum, item) => sum + item.pendingAmount, 0);
-  const avgMargin = activeClientProjects.length > 0 ? Math.round(activeClientProjects.reduce((sum, project) => sum + project.marginTarget, 0) / activeClientProjects.length) : 0;
   const riskProjects = projects.filter((project) => project.status === "Correcciones" || project.status === "Relevamiento").length;
   const trackedHours = events.reduce((sum, event) => sum + event.hours, 0);
   // Entregas: solo cuentan los proyectos que siguen abiertos. Uno "En uso" ya se entrego.
@@ -79,7 +73,7 @@ export function ProjectsWorkspace({
       <header className="command-header">
         <div>
           <h1>Proyectos en Curso</h1>
-          <p>Visualizacion de rendimiento, cobranza y riesgos operativos.</p>
+          <p>Elegí un proyecto para entrar a su espacio completo: pagos, reuniones, notas, estado y edición.</p>
         </div>
         <div className="command-filters">
           <label>
@@ -126,64 +120,34 @@ export function ProjectsWorkspace({
       </header>
 
       <section className="project-command-kpis">
-        <KpiCard label="Cartera clientes" value={`${money(arsSold)}${usdSold > 0 ? ` / ${money(usdSold, "USD")}` : ""}`} tone="green" />
-        <KpiCard label="Cobros pendientes" value={money(totalPending)} tone="blue" />
+        <KpiCard label="Proyectos activos" value={`${activeProjects.length}`} tone="green" />
+        <KpiCard label="Proyectos de clientes" value={`${clientProjects.length}`} tone="blue" />
         <KpiCard label="Productos propios" value={`${ownProjects.length}`} tone="blue" />
         <KpiCard label="Riesgo detectado" value={`${riskProjects} Proyectos`} tone="red" />
       </section>
 
-      <section className="project-ledger">
-        <div className="project-ledger-head">
-          <span>Proyecto / Amenity</span>
-          <span>Estado</span>
-          <span>Socio</span>
-          <span>Progreso</span>
-          <span>Monto vendido</span>
-          <span>Cobrado</span>
-          <span>Pendiente</span>
-          <span>Margen</span>
-          <span>Entrega</span>
-        </div>
-        <div className="project-ledger-body">
-          {filteredProjects.map(({ client, paidAmount, paidPercent, pendingAmount, project, trackedHours }) => (
-            <Link className="project-ledger-row" href={`/proyectos/${project.id}` as Route} key={project.id}>
-              <div className={`project-name-cell stripe-${riskTone(project.status)}`}>
-                <strong>{project.name}</strong>
-                <span>
-                  {project.kind === "Propio"
-                    ? `Producto propio${project.vertical ? ` · ${project.vertical}` : ""}`
-                    : `${client?.name ?? "Cliente"} · ${client?.industry ?? "Sin rubro"}`}
-                </span>
-                <span className="project-tag-row">
-                  <mark className={`kind-badge ${project.kind === "Propio" ? "own" : "client"}`}>{project.kind}</mark>
-                  {project.vertical ? <mark className="vertical-chip">{project.vertical}</mark> : null}
-                </span>
-              </div>
-              <div>
-                <mark className={`project-state ${riskTone(project.status)}`}>{project.status}</mark>
-              </div>
-              <div className="partner-cell">
-                <span className="partner-dot" />
-                <strong>{project.partners[0] ?? "Sin socio"}</strong>
-              </div>
-              <div className="progress-cell">
-                <span>{paidPercent}%</span>
-                <div className="table-progress"><i style={{ width: `${paidPercent}%` }} /></div>
-              </div>
-              <div className="money-cell">{money(project.salePrice, project.currency)}</div>
-              <div className="money-cell paid">{money(paidAmount, project.currency)}</div>
-              <div className={`money-cell ${pendingAmount > 0 ? "pending" : ""}`}>{money(pendingAmount, project.currency)}</div>
-              <div className="margin-cell">{project.marginTarget}%</div>
-              <div className="delivery-cell">
-                <strong className={dueTone(project)}>{dueLabel(project)}</strong>
-                <span>{trackedHours} h</span>
-              </div>
+      <section className="project-worklist">
+        <header>
+          <div>
+            <span>Proyectos</span>
+            <h2>Entrá al proyecto que quieras trabajar</h2>
+          </div>
+          <small>{filteredProjects.length} de {projects.length} proyectos · {source === "supabase" ? "Supabase" : "Mock"}</small>
+        </header>
+
+        <div className="project-worklist-body">
+          {filteredProjects.map(({ project }) => (
+            <Link className={`project-name-row stripe-${riskTone(project.status)}`} href={`/proyectos/${project.id}` as Route} key={project.id}>
+              <strong>{project.name}</strong>
             </Link>
           ))}
+          {filteredProjects.length === 0 ? (
+            <div className="panel-empty">
+              <strong>No hay proyectos con esos filtros.</strong>
+              <span>Limpiá algún filtro o creá un proyecto nuevo.</span>
+            </div>
+          ) : null}
         </div>
-        <footer className="project-ledger-footer">
-          <span>Mostrando {filteredProjects.length} de {projects.length} proyectos · {source === "supabase" ? "Supabase" : "Mock"}</span>
-        </footer>
       </section>
 
       <section className="project-command-bottom">
@@ -208,21 +172,22 @@ export function ProjectsWorkspace({
             <i style={{ width: `${activeProjects.length > 0 ? Math.round((withDueDate / activeProjects.length) * 100) : 0}%` }} />
           </div>
         </article>
-
         <article className="command-analysis-card">
           <header>
-            <h2>Resumen de cobranzas</h2>
-            <span>ARS</span>
+            <h2>Seguimiento operativo</h2>
+            <span>{source === "supabase" ? "Supabase" : "Mock"}</span>
           </header>
-          <div className="collection-grid">
-            <div>
-              <span>Recaudado</span>
-              <strong>{money(enrichedProjects.reduce((sum, item) => sum + item.paidAmount, 0))}</strong>
-            </div>
-            <div>
-              <span>Pendiente</span>
-              <strong>{money(totalPending)}</strong>
-            </div>
+          <div className="analysis-row">
+            <span>Proyectos de cliente</span>
+            <strong>{clientProjects.length}</strong>
+          </div>
+          <div className="analysis-row">
+            <span>Productos propios</span>
+            <strong>{ownProjects.length}</strong>
+          </div>
+          <div className="analysis-row">
+            <span>Necesitan atencion</span>
+            <strong className={riskProjects > 0 ? "warn-text" : ""}>{riskProjects}</strong>
           </div>
         </article>
       </section>
@@ -252,22 +217,4 @@ function riskTone(status: Project["status"]) {
 function remainingDays(dueDate: string) {
   const today = new Date().toISOString().slice(0, 10);
   return Math.round((new Date(`${dueDate}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 86400000);
-}
-
-function dueLabel(project: Project) {
-  if (project.status === "En uso") return "Entregado";
-  if (!project.dueDate) return "Definir fecha";
-  const days = remainingDays(project.dueDate);
-  if (days < 0) return `Vencido ${-days} d`;
-  if (days === 0) return "Vence hoy";
-  return `En ${days} d`;
-}
-
-function dueTone(project: Project) {
-  if (project.status === "En uso") return "";
-  // Sin fecha no es neutro: es un dato que falta y hay que ir a cargar.
-  if (!project.dueDate) return "muted-text";
-  const days = remainingDays(project.dueDate);
-  if (days < 0) return "danger-text";
-  return days <= 7 ? "warn-text" : "";
 }

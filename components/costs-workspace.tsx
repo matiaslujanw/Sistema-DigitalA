@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addCostAction, deleteCostAction } from "@/app/actions/projects";
+import { addCostAction, deleteCostAction, markCostPaidAction } from "@/app/actions/projects";
+import { getBillingState } from "@/lib/billing";
 import { money } from "@/lib/format";
 import type { Cost, Project } from "@/lib/types";
 
@@ -29,6 +30,7 @@ export function CostsWorkspace({
     cadence: "Mensual" as Cost["cadence"],
     category: "Infra" as Cost["category"],
     currency: "ARS" as "ARS" | "USD",
+    dueDay: "10",
     name: "",
     projectId: "",
     provider: ""
@@ -40,6 +42,14 @@ export function CostsWorkspace({
   const softwareTotal = monthlyCosts.filter((cost) => cost.category === "Software").reduce((sum, cost) => sum + normalizeCost(cost), 0);
   const usdMonthly = monthlyCosts.filter((cost) => cost.currency === "USD");
   const categoryTotals = getCategoryTotals(costs);
+  const monthlyBilling = monthlyCosts
+    .map((cost) => ({ cost, state: getBillingState({ dueDay: cost.dueDay ?? 10, lastPaidMonth: cost.lastPaidMonth }) }))
+    .sort((a, b) => {
+      if (a.state.isPaid !== b.state.isPaid) return a.state.isPaid ? 1 : -1;
+      return a.state.daysUntil - b.state.daysUntil;
+    });
+  const pendingMonthlyCosts = monthlyBilling.filter((item) => !item.state.isPaid);
+  const overdueMonthlyCosts = pendingMonthlyCosts.filter((item) => item.state.isOverdue);
 
   const alerts = useMemo(() => buildAlerts(costs, projects), [costs, projects]);
 
@@ -54,6 +64,8 @@ export function CostsWorkspace({
       category: draft.category,
       currency: draft.currency,
       name: draft.name.trim(),
+      dueDay: draft.cadence === "Mensual" ? Math.min(31, Math.max(1, Number(draft.dueDay) || 10)) : null,
+      lastPaidMonth: null,
       projectId: draft.projectId || null,
       provider: draft.provider.trim() || "Sin proveedor"
     };
@@ -71,6 +83,7 @@ export function CostsWorkspace({
           cadence: cost.cadence,
           category: cost.category,
           currency: cost.currency,
+          dueDay: cost.dueDay,
           name: cost.name,
           projectId: cost.projectId,
           provider: cost.provider
@@ -88,6 +101,28 @@ export function CostsWorkspace({
   function resetDraft() {
     setDraft((current) => ({ ...current, amount: "", name: "", provider: "" }));
     setShowForm(false);
+  }
+
+  function markCostPaid(cost: Cost, monthKey: string) {
+    const applyLocal = () => {
+      setCosts((current) => current.map((item) => (item.id === cost.id ? { ...item, lastPaidMonth: monthKey } : item)));
+    };
+
+    if (source !== "supabase") {
+      applyLocal();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await markCostPaidAction(cost.id, monthKey);
+        applyLocal();
+        setFeedback(`${cost.name} marcado como pagado`);
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo marcar el gasto como pagado");
+      }
+    });
   }
 
   function deleteCost(cost: Cost) {
@@ -192,6 +227,10 @@ export function CostsWorkspace({
                 </select>
               </label>
               <label className="field">
+                <span>Día de pago</span>
+                <input disabled={draft.cadence !== "Mensual"} min="1" max="31" type="number" value={draft.dueDay} onChange={(event) => setDraft((current) => ({ ...current, dueDay: event.target.value }))} />
+              </label>
+              <label className="field">
                 <span>Proyecto (opcional)</span>
                 <select value={draft.projectId} onChange={(event) => setDraft((current) => ({ ...current, projectId: event.target.value }))}>
                   <option value="">Corporate</option>
@@ -213,7 +252,7 @@ export function CostsWorkspace({
         <OpsKpi label="Gasto mensual total" value={money(monthlyTotal)} note={`${monthlyCosts.length} servicios activos`} tone="blue" />
         <OpsKpi label="Infraestructura & AI" value={money(infraTotal)} note={`${monthlyCosts.filter((cost) => cost.category === "Infra").length} servicios`} tone="orange" />
         <OpsKpi label="Software operativo" value={money(softwareTotal)} note={`${monthlyCosts.filter((cost) => cost.category === "Software").length} servicios`} tone="green" />
-        <OpsKpi label="Exposicion USD" value={money(usdMonthly.reduce((sum, cost) => sum + cost.amount, 0), "USD")} note={`${usdMonthly.length} servicios en USD`} tone="neutral" />
+        <OpsKpi label="Gastos por pagar" value={`${pendingMonthlyCosts.length}`} note={`${overdueMonthlyCosts.length} vencidos este mes`} tone={overdueMonthlyCosts.length > 0 ? "orange" : "neutral"} />
       </section>
 
       <section className="ops-table-card">
@@ -228,12 +267,13 @@ export function CostsWorkspace({
           <span>Costo</span>
           <span>Cadencia</span>
           <span>Asociado a</span>
-          <span>Estado</span>
-          <span>Equivalente ARS</span>
-          <span>Accion</span>
+              <span>Vencimiento</span>
+              <span>Equivalente ARS</span>
+              <span>Accion</span>
         </div>
         {costs.map((cost) => {
           const project = projects.find((item) => item.id === cost.projectId);
+          const billing = cost.cadence === "Mensual" ? getBillingState({ dueDay: cost.dueDay ?? 10, lastPaidMonth: cost.lastPaidMonth }) : null;
           return (
             <article className="ops-table-row" key={cost.id}>
               <div className="ops-service">
@@ -246,9 +286,14 @@ export function CostsWorkspace({
               <strong>{money(cost.amount, cost.currency)}</strong>
               <span>{cost.cadence}</span>
               <mark>{project?.name ?? "Corporate"}</mark>
-              <StatusBadge cost={cost} />
+              <StatusBadge cost={cost} billing={billing} />
               <span>{cost.currency === "USD" ? money(cost.amount * exchangeRate) : "—"}</span>
               <div className="table-actions">
+                {billing ? (
+                  <button disabled={isPending || billing.isPaid} type="button" onClick={() => markCostPaid(cost, billing.monthKey)}>
+                    {billing.isPaid ? "Pagado" : "Pagar mes"}
+                  </button>
+                ) : null}
                 <button className={confirmingDeleteId === cost.id ? "danger-confirm" : ""} disabled={isPending} type="button" onClick={() => deleteCost(cost)}>
                   {confirmingDeleteId === cost.id ? "Confirmar" : "Borrar"}
                 </button>
@@ -279,7 +324,11 @@ export function CostsWorkspace({
 
         <aside className="alerts-card">
           <h2>Alertas Financieras</h2>
-          {alerts.length > 0 ? (
+          {pendingMonthlyCosts.length > 0 ? (
+            pendingMonthlyCosts.slice(0, 4).map(({ cost, state }) => (
+              <Alert detail={`${state.label} · ${money(cost.amount, cost.currency)}`} key={cost.id} title={cost.name} tone={state.isOverdue ? "red" : state.daysUntil <= 7 ? "orange" : "green"} />
+            ))
+          ) : alerts.length > 0 ? (
             alerts.map((alert) => <Alert detail={alert.detail} key={alert.title} title={alert.title} tone={alert.tone} />)
           ) : (
             <div className="ops-alert green">
@@ -304,9 +353,9 @@ function OpsKpi({ label, note, tone, value }: { label: string; note: string; ton
   );
 }
 
-function StatusBadge({ cost }: { cost: Cost }) {
-  const label = cost.cadence === "Unico" ? "Pagado" : "Activo";
-  const tone = cost.cadence === "Unico" ? "neutral" : "green";
+function StatusBadge({ billing, cost }: { billing: ReturnType<typeof getBillingState> | null; cost: Cost }) {
+  const label = cost.cadence === "Unico" ? "Pago unico" : billing?.label ?? "Activo";
+  const tone = cost.cadence === "Unico" ? "neutral" : billing?.tone === "late" ? "red" : billing?.tone === "soon" ? "orange" : "green";
   return <b className={`ops-status ${tone}`}>{label}</b>;
 }
 

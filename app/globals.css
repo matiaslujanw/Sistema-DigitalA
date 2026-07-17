@@ -9,37 +9,37 @@ agregalo acá y no hardcodees un hex en una regla.
    ============================================================ */
 :root {
   /* Superficies: ground = la página; surface-1..3 = elevación */
-  --ground: #07080b;
-  --surface-1: #0c0e12;
-  --surface-2: #14161c;
-  --surface-3: #1d2028;
+  --ground: #030712;
+  --surface-1: #07111f;
+  --surface-2: #0b1830;
+  --surface-3: #112340;
 
   /* Bordes: hairline por defecto, strong para énfasis/foco */
-  --border: #262a34;
-  --border-strong: #3a4050;
+  --border: #1c3d5c;
+  --border-strong: #2ef2ff;
 
   /* Texto */
-  --text: #e8eaf0;
-  --muted: #a2a9b8;
-  --faint: #6d7482;
+  --text: #eff8ff;
+  --muted: #93b8ca;
+  --faint: #557386;
 
   /* Acento (identidad) — separado del color semántico */
-  --accent: #b9cdfd;
-  --accent-ink: #0b1020;
+  --accent: #2ef2ff;
+  --accent-ink: #02101a;
 
   /* Semántico: estado, no identidad */
-  --success: #55e49b;
-  --warning: #ffb37d;
-  --danger: #ff9d92;
-  --note: #d7b46a;
+  --success: #48ff9b;
+  --warning: #ffd166;
+  --danger: #ff4fd8;
+  --note: #b56cff;
 
   /* Papel: las notas adhesivas de /ideas son objetos físicos y se
      mantienen claras en ambos temas a propósito. No van a :root[light]. */
   --paper: #e8e9ef;
   --paper-ink: #101114;
-  --paper-media: #b9cdfd;
-  --paper-alta: #ffc89b;
-  --paper-urgente: #ffb1a7;
+  --paper-media: #2ef2ff;
+  --paper-alta: #ffd166;
+  --paper-urgente: #ff8ee7;
   --paper-tape: rgba(214, 218, 226, 0.38);
 
   /* Tints: se derivan del semántico, así funcionan en ambos temas */
@@ -50,12 +50,12 @@ agregalo acá y no hardcodees un hex en una regla.
   --note-tint: color-mix(in srgb, var(--note) 14%, transparent);
 
   /* Geometría y elevación */
-  --radius: 6px;
-  --radius-sm: 4px;
-  --radius-lg: 10px;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
   --rail-width: 264px;
   --rail-collapsed-width: 88px;
-  --shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+  --shadow: 0 18px 54px rgba(0, 0, 0, 0.42), 0 0 28px color-mix(in srgb, var(--accent) 10%, transparent);
 
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
@@ -65,27 +65,27 @@ agregalo acá y no hardcodees un hex en una regla.
    ground gris) y el acento se oscurece: el periwinkle #b9cdfd
    no tiene contraste suficiente sobre blanco. */
 :root[data-theme="light"] {
-  --ground: #f2f4f7;
+  --ground: #eefaff;
   --surface-1: #ffffff;
-  --surface-2: #f7f8fb;
-  --surface-3: #eceff4;
+  --surface-2: #edf8ff;
+  --surface-3: #dff2ff;
 
-  --border: #dfe3ea;
-  --border-strong: #c2c8d4;
+  --border: #b7e8f4;
+  --border-strong: #0bb8d4;
 
-  --text: #12151c;
-  --muted: #59616f;
-  --faint: #858c9a;
+  --text: #06121f;
+  --muted: #426777;
+  --faint: #7897a5;
 
-  --accent: #2f52c8;
+  --accent: #00b8d9;
   --accent-ink: #ffffff;
 
-  --success: #127a4d;
-  --warning: #9a5410;
-  --danger: #c0362c;
-  --note: #856517;
+  --success: #07985e;
+  --warning: #ad6b00;
+  --danger: #c21894;
+  --note: #7a32d9;
 
-  --shadow: 0 14px 36px rgba(18, 21, 28, 0.1);
+  --shadow: 0 14px 36px rgba(6, 18, 31, 0.11), 0 0 20px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 /* ------------------------------------------------------------
@@ -114,9 +114,9 @@ sacá el alias.
   --amber: var(--warning);
   --pink: var(--danger);
   --violet: var(--muted);
-  --grid-color: transparent;
-  --glow-a: transparent;
-  --glow-b: transparent;
+  --grid-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  --glow-a: color-mix(in srgb, var(--accent) 18%, transparent);
+  --glow-b: color-mix(in srgb, var(--danger) 12%, transparent);
 
   --exec-bg: var(--ground);
   --exec-panel: var(--surface-1);
@@ -148,7 +148,14 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background: var(--ground);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(180deg, color-mix(in srgb, var(--note) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 34%),
+    linear-gradient(225deg, color-mix(in srgb, var(--danger) 7%, transparent), transparent 38%),
+    var(--ground);
+  background-size: 44px 44px, 44px 44px, auto, auto, auto;
+  background-attachment: fixed;
   color: var(--text);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   overflow-x: hidden;
@@ -3130,7 +3137,7 @@ which breaks dense routes like Proyectos. */
 .finance-kpis,
 .ops-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 20px;
 }
 
@@ -5110,4 +5117,843 @@ textarea:focus-visible {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* ── Finanzas: flujos de caja trazables ─────────────────────────────── */
+.finance-feedback {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.finance-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.finance-flows {
+  display: grid;
+  gap: 16px;
+}
+
+.finance-flow {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  padding: 16px 18px;
+}
+
+.flow-cobro-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.flow-cobro-head strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.flow-cobro-sub {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.flow-cobro-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flow-saldo {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--muted);
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.flow-saldo.has {
+  border-color: var(--warning-tint);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--exec-orange, var(--warning));
+}
+
+.flow-add {
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-tint);
+  color: var(--accent);
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.flow-tree {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.flow-tree:empty {
+  margin-top: 0;
+}
+
+.flow-node {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.flow-node-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.flow-kind {
+  display: inline-flex;
+  align-items: center;
+  min-width: 84px;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Hijo directo: los pasos anidados dentro de un Cambio no deben heredar su color. */
+.flow-node.kind-reparto > .flow-node-row > .flow-kind {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.flow-node.kind-cambio > .flow-node-row > .flow-kind {
+  border-color: var(--success-tint);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--exec-green, var(--success));
+}
+
+.flow-node-copy {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.flow-node-copy strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.flow-node-copy span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.flow-amount {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.flow-del {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.flow-pool {
+  margin: 0 12px 12px 20px;
+  padding: 10px 0 2px 14px;
+  border-left: 2px solid var(--border-strong);
+  display: grid;
+  gap: 8px;
+}
+
+.flow-pool-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.step-form {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.investment-preview {
+  min-height: 74px;
+  border: 1px solid color-mix(in srgb, var(--success) 36%, transparent);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--success) 12%, transparent), transparent 68%),
+    var(--surface-2);
+  padding: 12px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.investment-preview span,
+.investment-preview small,
+.investment-result {
+  color: var(--success);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.investment-preview strong {
+  color: var(--text);
+  font-size: 1.15rem;
+}
+
+.finance-side {
+  display: grid;
+  gap: 16px;
+}
+
+.socio-split {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  padding: 16px 18px;
+}
+
+.socio-split h2 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+
+.socio-split-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.socio-split-row:first-of-type {
+  border-top: none;
+}
+
+.socio-split-row span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.socio-split-row strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.socio-split-row b {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Ajustes UX: menos arista dura, mas tactilidad ─────────────────── */
+.command-primary,
+.finance-export,
+.command-filters select,
+.finance-ledger select,
+.row-actions button,
+.table-actions button,
+.timeline-actions button,
+.meeting-row-actions button,
+.finance-ledger-row mark,
+.ops-table-row mark,
+.ops-status,
+.flow-del,
+.flow-add,
+.flow-kind,
+.partner-distribution button,
+.alerts-card button {
+  border-radius: var(--radius);
+}
+
+.panel-block,
+.executive-panel,
+.project-ledger,
+.project-worklist,
+.project-kpi,
+.finance-kpi,
+.ops-kpi,
+.ops-table-card,
+.category-card,
+.alerts-card,
+.finance-drawer,
+.finance-flow,
+.socio-split,
+.exchange-card,
+.note-card,
+.data-row,
+.event-line {
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 12%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.command-primary,
+.primary-button,
+.project-action.primary,
+.payment-form button,
+.command-button {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 26%, transparent);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent-ink) 35%, transparent);
+}
+
+.command-primary:hover:not(:disabled),
+.primary-button:hover:not(:disabled),
+.project-action.primary:hover,
+.payment-form button:hover:not(:disabled),
+.command-button:hover {
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.route-list a:hover,
+.route-list a.active,
+.project-name-row:hover,
+.finance-flow:hover,
+.maintenance-row:hover,
+.data-row:hover,
+.event-line:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 14%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.brand-mark,
+.brand-cube,
+.rail-user-avatar,
+.partner-dot,
+.map-surface {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.status-pending,
+.project-state,
+.kind-badge,
+.vertical-chip,
+.readonly-badge,
+.flow-saldo,
+.due-badge {
+  box-shadow: inset 0 0 18px color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.nav-icon-maintenance::before {
+  width: 18px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+}
+
+.nav-icon-maintenance::after {
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 5px 0 currentColor, 0 -5px 0 currentColor;
+}
+
+.project-touchbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.project-worklist {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.project-worklist > header {
+  min-height: 76px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.project-worklist > header span,
+.project-work-client,
+.project-work-status span,
+.project-work-money span {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-worklist > header h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 1.2rem;
+}
+
+.project-worklist > header small {
+  color: var(--muted);
+}
+
+.project-worklist-body {
+  display: grid;
+}
+
+.project-name-row {
+  position: relative;
+  min-height: 76px;
+  padding: 0 26px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.project-name-row:first-child {
+  border-top: 0;
+}
+
+.project-name-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 4px;
+  border-radius: 0 999px 999px 0;
+  background: var(--accent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.project-name-row.stripe-critical::before {
+  background: var(--danger);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+.project-name-row.stripe-paused::before {
+  background: var(--warning);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--warning) 45%, transparent);
+}
+
+.project-name-row.stripe-neutral::before {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+.project-name-row.stripe-blue::before {
+  background: var(--accent);
+}
+
+.project-name-row strong {
+  color: var(--text);
+  font-size: clamp(1.05rem, 2vw, 1.45rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.project-name-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%),
+    var(--surface-2);
+  transform: translateX(2px);
+}
+
+.detail-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.detail-quick-actions button {
+  min-height: 40px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: var(--radius);
+  background: var(--accent-tint);
+  color: var(--accent);
+  padding: 0 14px;
+  font-weight: 800;
+}
+
+.project-touchbar button {
+  min-height: 82px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--text);
+  padding: 14px 16px;
+  text-align: left;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.project-touchbar button:hover,
+.project-touchbar button.active {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  background:
+    linear-gradient(135deg, var(--accent-tint), transparent 68%),
+    var(--surface-2);
+}
+
+.project-touchbar span {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-touchbar strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.98rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-section.is-hidden {
+  display: none;
+}
+
+.project-section.active {
+  animation: soft-in 160ms ease;
+}
+
+.section-cobros,
+.section-actividad,
+.section-notas {
+  grid-column: 1 / -1;
+}
+
+@keyframes soft-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.billing-watch-panel {
+  grid-column: 1 / -1;
+}
+
+.billing-watch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.billing-watch-grid div,
+.dashboard-billing-alert,
+.billing-alert,
+.maintenance-kpi,
+.maintenance-row,
+.maintenance-alerts,
+.maintenance-drawer {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.billing-watch-grid div {
+  min-height: 96px;
+  padding: 16px;
+  display: grid;
+  gap: 5px;
+}
+
+.billing-watch-grid span,
+.dashboard-billing-alert span,
+.maintenance-kpi span,
+.maintenance-head span,
+.maintenance-row span,
+.maintenance-alerts h2,
+.billing-alert span {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.billing-watch-grid strong {
+  color: var(--text);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.billing-watch-grid small,
+.dashboard-billing-alert small,
+.maintenance-row small {
+  color: var(--muted);
+}
+
+.billing-alert-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-billing-alert {
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.dashboard-billing-alert strong {
+  color: var(--text);
+}
+
+.dashboard-billing-alert.late,
+.billing-alert.late,
+.maintenance-row.late,
+.ops-status.red {
+  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+  background: var(--danger-tint);
+}
+
+.dashboard-billing-alert.soon,
+.billing-alert.soon,
+.maintenance-row.soon,
+.ops-status.orange {
+  border-color: color-mix(in srgb, var(--warning) 42%, transparent);
+  background: var(--warning-tint);
+}
+
+.dashboard-billing-alert.paid,
+.billing-alert.paid,
+.maintenance-row.paid {
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  background: var(--success-tint);
+}
+
+.maintenance-command {
+  display: grid;
+  gap: 24px;
+}
+
+.maintenance-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.maintenance-head h1 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.maintenance-head p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.maintenance-drawer {
+  padding: 22px;
+}
+
+.maintenance-drawer header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.maintenance-drawer header strong {
+  color: var(--success);
+}
+
+.maintenance-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.maintenance-kpi {
+  min-height: 132px;
+  padding: 22px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.maintenance-kpi strong {
+  color: var(--text);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.maintenance-kpi small {
+  color: var(--muted);
+}
+
+.maintenance-kpi.green span,
+.maintenance-kpi.green strong {
+  color: var(--success);
+}
+
+.maintenance-kpi.orange span,
+.maintenance-kpi.orange strong {
+  color: var(--warning);
+}
+
+.maintenance-kpi.red span,
+.maintenance-kpi.red strong {
+  color: var(--danger);
+}
+
+.maintenance-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+}
+
+.maintenance-list {
+  display: grid;
+  gap: 12px;
+}
+
+.maintenance-row {
+  min-height: 118px;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 150px 160px auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.maintenance-main {
+  display: grid;
+  gap: 5px;
+}
+
+.maintenance-row strong {
+  color: var(--text);
+}
+
+.maintenance-row a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.maintenance-row button {
+  min-height: 40px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: var(--radius);
+  background: var(--accent-tint);
+  color: var(--accent);
+  padding: 0 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.maintenance-alerts {
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.maintenance-alerts h2 {
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.billing-alert {
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.billing-alert strong {
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .finance-two-col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-touchbar,
+  .maintenance-kpis,
+  .billing-watch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .maintenance-board,
+  .maintenance-row,
+  .project-work-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-work-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }

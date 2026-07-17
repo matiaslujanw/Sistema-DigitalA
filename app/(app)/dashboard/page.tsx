@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { getBillingState } from "@/lib/billing";
 import { getAppData } from "@/lib/data";
 import { dateLabel, daysBetween, money } from "@/lib/format";
 
 export default async function DashboardPage() {
-  const { cashMovements, clients, costs, events, payments: projectPayments, projects, source } = await getAppData();
+  const { cashMovements, clients, costs, events, maintenanceContracts, payments: projectPayments, projects, source } = await getAppData();
   const today = new Date().toISOString().slice(0, 10);
 
   const totalSold = projects.filter((project) => project.currency === "ARS").reduce((sum, project) => sum + project.salePrice, 0);
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
       ? Math.round(activeProjects.reduce((sum, project) => sum + project.marginTarget, 0) / activeProjects.length)
       : 0;
   const partnerDistribution = cashMovements
-    .filter((movement) => movement.operation === "Reparto socios" && movement.currency === "ARS")
+    .filter((movement) => movement.kind === "Reparto" && movement.currency === "ARS")
     .reduce((sum, movement) => sum + movement.amount, 0);
   const trackedHours = events.reduce((sum, event) => sum + event.hours, 0);
 
@@ -55,6 +56,18 @@ export default async function DashboardPage() {
   const riskProjects = projects.filter((project) => project.status === "Correcciones" || project.status === "Relevamiento").length;
   const healthPercent = activeProjects.length > 0 ? Math.round(((activeProjects.length - riskProjects) / activeProjects.length) * 100) : 100;
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+  const maintenanceBilling = maintenanceContracts
+    .filter((contract) => contract.active)
+    .map((contract) => ({ contract, state: getBillingState({ dueDay: contract.dueDay, lastPaidMonth: contract.lastPaidMonth }) }))
+    .filter((item) => !item.state.isPaid)
+    .sort((a, b) => a.state.daysUntil - b.state.daysUntil);
+  const fixedCostBilling = costs
+    .filter((cost) => cost.cadence === "Mensual")
+    .map((cost) => ({ cost, state: getBillingState({ dueDay: cost.dueDay ?? 10, lastPaidMonth: cost.lastPaidMonth }) }))
+    .filter((item) => !item.state.isPaid)
+    .sort((a, b) => a.state.daysUntil - b.state.daysUntil);
+  const maintenanceArs = maintenanceBilling.filter((item) => item.contract.currency === "ARS").reduce((sum, item) => sum + item.contract.amount, 0);
+  const maintenanceUsd = maintenanceBilling.filter((item) => item.contract.currency === "USD").reduce((sum, item) => sum + item.contract.amount, 0);
 
   return (
     <section className="executive-overview">
@@ -85,6 +98,47 @@ export default async function DashboardPage() {
       </section>
 
       <section className="overview-main-grid">
+        <article className="executive-panel billing-watch-panel">
+          <div className="panel-title-row">
+            <h2>Cobros y gastos del mes</h2>
+            <Link href="/mantenimientos">Ver mantenimientos</Link>
+          </div>
+          <div className="billing-watch-grid">
+            <div>
+              <span>Mantenimientos por cobrar</span>
+              <strong>{maintenanceBilling.length}</strong>
+              <small>{money(maintenanceArs)}{maintenanceUsd > 0 ? ` / ${money(maintenanceUsd, "USD")}` : ""}</small>
+            </div>
+            <div>
+              <span>Gastos fijos por pagar</span>
+              <strong>{fixedCostBilling.length}</strong>
+              <small>{fixedCostBilling.filter((item) => item.state.isOverdue).length} vencidos</small>
+            </div>
+          </div>
+          <div className="billing-alert-list">
+            {maintenanceBilling.slice(0, 3).map(({ contract, state }) => (
+              <Link className={`dashboard-billing-alert ${state.tone}`} href="/mantenimientos" key={contract.id}>
+                <span>Cobro</span>
+                <strong>{contract.systemName}</strong>
+                <small>{state.label} · {money(contract.amount, contract.currency)}</small>
+              </Link>
+            ))}
+            {fixedCostBilling.slice(0, 2).map(({ cost, state }) => (
+              <Link className={`dashboard-billing-alert ${state.tone}`} href="/costos" key={cost.id}>
+                <span>Gasto</span>
+                <strong>{cost.name}</strong>
+                <small>{state.label} · {money(cost.amount, cost.currency)}</small>
+              </Link>
+            ))}
+            {maintenanceBilling.length === 0 && fixedCostBilling.length === 0 ? (
+              <div className="panel-empty">
+                <strong>Mes al día.</strong>
+                <span>No hay cobros ni gastos pendientes.</span>
+              </div>
+            ) : null}
+          </div>
+        </article>
+
         <article className="executive-panel meetings-panel">
           <div className="panel-title-row">
             <h2>{upcomingMeetings.length > 0 ? "Proximas reuniones" : "Ultimas reuniones"}</h2>

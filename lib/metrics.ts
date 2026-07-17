@@ -1,5 +1,5 @@
-import { cashMovements, costs, events, projects } from "./mock-data";
-import type { CashDestination, CashMovement, Cost, Project, ProjectEvent, ProjectStatus } from "./types";
+import { costs, events, projects } from "./mock-data";
+import type { Cost, Project, ProjectEvent, ProjectStatus } from "./types";
 import { projectStatuses } from "./project-statuses";
 
 export function getOverviewMetrics(input?: { costs: Cost[]; events: ProjectEvent[]; projects: Project[] }) {
@@ -25,22 +25,5 @@ export function getProjectsByStatus(inputProjects = projects) {
       return acc;
     },
     Object.fromEntries(projectStatuses.map((status) => [status, 0])) as Record<ProjectStatus, number>
-  );
-}
-
-export function getCashByDestination(inputCashMovements: CashMovement[] = cashMovements) {
-  return inputCashMovements.reduce<Record<CashDestination, number>>(
-    (acc, movement) => {
-      acc[movement.destination] += movement.amount;
-      return acc;
-    },
-    {
-      Caja: 0,
-      Cheques: 0,
-      Dolares: 0,
-      "Plazo fijo": 0,
-      Reinversion: 0,
-      "Reparto socios": 0
-    }
   );
 }

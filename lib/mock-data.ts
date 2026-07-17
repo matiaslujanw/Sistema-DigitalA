@@ -1,4 +1,4 @@
-import type { CashMovement, Client, Cost, PartnerProfile, Project, ProjectEvent, ProjectPayment } from "./types";
+import type { CashMovement, Client, Cost, MaintenanceContract, PartnerProfile, Project, ProjectEvent, ProjectPayment } from "./types";
 
 export const partners = ["Matias", "Socio 2", "Socio 3"];
 
@@ -240,61 +240,97 @@ export const events: ProjectEvent[] = [
 ];
 
 export const costs: Cost[] = [
-  { id: "co1", projectId: null, name: "Supabase Pro", provider: "Supabase", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra" },
-  { id: "co2", projectId: null, name: "Hosting landing", provider: "Hostinger", amount: 10, currency: "USD", cadence: "Mensual", category: "Infra" },
-  { id: "co3", projectId: "p1", name: "WhatsApp API", provider: "Meta", amount: 32000, currency: "ARS", cadence: "Mensual", category: "Software" },
-  { id: "co4", projectId: "p3", name: "Dominio cliente", provider: "NIC", amount: 18000, currency: "ARS", cadence: "Unico", category: "Dominio" },
-  { id: "co5", projectId: null, name: "Vercel", provider: "Vercel", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra" }
+  { id: "co1", projectId: null, name: "Supabase Pro", provider: "Supabase", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra", dueDay: 8, lastPaidMonth: "2026-07" },
+  { id: "co2", projectId: null, name: "Hosting landing", provider: "Hostinger", amount: 10, currency: "USD", cadence: "Mensual", category: "Infra", dueDay: 22, lastPaidMonth: null },
+  { id: "co3", projectId: "p1", name: "WhatsApp API", provider: "Meta", amount: 32000, currency: "ARS", cadence: "Mensual", category: "Software", dueDay: 19, lastPaidMonth: null },
+  { id: "co4", projectId: "p3", name: "Dominio cliente", provider: "NIC", amount: 18000, currency: "ARS", cadence: "Unico", category: "Dominio", dueDay: null, lastPaidMonth: null },
+  { id: "co5", projectId: null, name: "Vercel", provider: "Vercel", amount: 20, currency: "USD", cadence: "Mensual", category: "Infra", dueDay: 25, lastPaidMonth: null }
 ];
 
-export const cashMovements: CashMovement[] = [
+export const maintenanceContracts: MaintenanceContract[] = [
   {
     id: "m1",
-    sourceProjectId: "p2",
-    date: "2026-05-15",
-    concept: "Cobro final La Vieja Escuela",
-    amount: 600000,
+    projectId: "p2",
+    systemName: "Soporte IA La Vieja Escuela",
+    clientName: "La Vieja Escuela",
+    amount: 180000,
     currency: "ARS",
-    destination: "Reparto socios",
-    operation: "Reparto socios",
-    notes: "Se dividio en partes iguales."
+    dueDay: 20,
+    lastPaidMonth: null,
+    active: true,
+    notes: "Mantenimiento mensual, ajustes menores y monitoreo del flujo IA."
   },
   {
     id: "m2",
-    sourceProjectId: "p1",
-    date: "2026-06-05",
-    concept: "Anticipo Malala",
-    amount: 450000,
-    currency: "ARS",
-    destination: "Plazo fijo",
-    operation: "Inversion",
-    expectedReturnPercent: 6.8,
-    actualReturnPercent: 6.4,
-    notes: "Se deja inmovilizado hasta segunda entrega."
-  },
+    projectId: "p3",
+    systemName: "Mantenimiento tienda Bonivibe",
+    clientName: "Bonivibe",
+    amount: 250,
+    currency: "USD",
+    dueDay: 10,
+    lastPaidMonth: "2026-07",
+    active: true,
+    notes: "Soporte de checkout, stock y deploy."
+  }
+];
+
+// Flujo de ejemplo sobre el cobro pay5 (900 USD de Bonivibe):
+// se cambia todo a pesos y con esos pesos se compra un cheque y se reparte a dos socios.
+// Saldo sin asignar del cambio = 1.350.000 − 500.000 − 400.000 − 400.000 = 50.000 ARS.
+export const cashMovements: CashMovement[] = [
   {
-    id: "m3",
+    id: "mov1",
+    paymentId: "pay5",
+    parentMovementId: null,
     sourceProjectId: "p3",
-    date: "2026-06-12",
-    concept: "Pago Bonivibe",
+    kind: "Cambio",
+    date: "2026-03-20",
+    concept: "Cambio del cobro a pesos",
     amount: 900,
     currency: "USD",
-    destination: "Caja",
-    operation: "Reserva",
-    notes: "Reserva para costos dolarizados."
+    partnerId: null,
+    acquiredCurrency: "ARS",
+    acquiredAmount: 1350000,
+    exchangeRate: 1500,
+    notes: "Se cambio todo el cobro a la cotizacion del dia."
   },
   {
-    id: "m4",
-    sourceProjectId: null,
-    date: "2026-06-20",
-    concept: "Compra de dolares",
-    amount: 300,
-    currency: "USD",
-    destination: "Dolares",
-    operation: "Compra divisa",
-    acquiredCurrency: "USD",
-    acquiredAmount: 300,
-    exchangeRate: 1210,
-    notes: "Cobertura de caja."
+    id: "mov2",
+    paymentId: "pay5",
+    parentMovementId: "mov1",
+    sourceProjectId: "p3",
+    kind: "Cheque",
+    date: "2026-03-21",
+    concept: "Compra de cheque",
+    amount: 500000,
+    currency: "ARS",
+    partnerId: null,
+    notes: "Cheque a 30 dias."
+  },
+  {
+    id: "mov3",
+    paymentId: "pay5",
+    parentMovementId: "mov1",
+    sourceProjectId: "p3",
+    kind: "Reparto",
+    date: "2026-03-21",
+    concept: "Reparto a socio",
+    amount: 400000,
+    currency: "ARS",
+    partnerId: "u1",
+    notes: ""
+  },
+  {
+    id: "mov4",
+    paymentId: "pay5",
+    parentMovementId: "mov1",
+    sourceProjectId: "p3",
+    kind: "Reparto",
+    date: "2026-03-21",
+    concept: "Reparto a socio",
+    amount: 400000,
+    currency: "ARS",
+    partnerId: "u2",
+    notes: ""
   }
 ];

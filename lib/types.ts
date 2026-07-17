@@ -11,9 +11,10 @@ export type ProjectKind = "Propio" | "Cliente";
 
 export type PaymentMethod = "Transferencia" | "Efectivo" | "USD" | "Cheque" | "Mixto";
 
-export type CashDestination = "Reparto socios" | "Plazo fijo" | "Dolares" | "Cheques" | "Reinversion" | "Caja";
-
-export type FinanceOperation = "Cobro" | "Reparto socios" | "Compra divisa" | "Inversion" | "Gasto" | "Reserva";
+// Pasos con los que se asigna un cobro: cambio de moneda, compra de cheque,
+// plazo fijo, reparto a un socio, gasto o dejar en caja. Solo Cambio genera
+// un "pool" nuevo (la plata resultante) del que pueden colgar mas pasos.
+export type AllocationKind = "Cambio" | "Cheque" | "Plazo fijo" | "Reparto" | "Gasto" | "Caja";
 
 export type Client = {
   id: string;
@@ -96,21 +97,42 @@ export type Cost = {
   currency: "ARS" | "USD";
   cadence: "Mensual" | "Unico";
   category: "Infra" | "Software" | "Dominio" | "Marketing" | "Operativo";
+  dueDay?: number | null;
+  lastPaidMonth?: string | null;
 };
 
-export type CashMovement = {
+export type MaintenanceContract = {
   id: string;
-  sourceProjectId: string | null;
-  date: string;
-  concept: string;
+  projectId: string;
+  systemName: string;
+  clientName: string;
   amount: number;
   currency: "ARS" | "USD";
-  destination: CashDestination;
-  operation: FinanceOperation;
-  acquiredCurrency?: "USD" | "EUR" | "USDT" | "ARS";
-  acquiredAmount?: number;
-  exchangeRate?: number;
-  expectedReturnPercent?: number;
+  dueDay: number;
+  lastPaidMonth: string | null;
+  active: boolean;
+  notes: string;
+};
+
+// Un paso de asignacion de plata. Cuelga siempre de un cobro (paymentId = el
+// pago del proyecto que origina el flujo) y, opcionalmente, de otro paso
+// (parentMovementId: p.ej. un reparto que sale del ARS de un cambio).
+export type CashMovement = {
+  id: string;
+  paymentId: string | null;
+  parentMovementId: string | null;
+  sourceProjectId: string | null;
+  kind: AllocationKind;
+  date: string;
+  dueDate?: string | null; // para cheques/plazos: cuando se espera cobrar
+  concept: string;
+  amount: number; // monto que consume del pool padre, en la moneda de ese pool
+  currency: "ARS" | "USD";
+  partnerId: string | null; // para Reparto: a que socio
+  acquiredCurrency?: "USD" | "EUR" | "USDT" | "ARS"; // para Cambio: moneda resultante
+  acquiredAmount?: number; // para Cambio: monto resultante
+  exchangeRate?: number; // para Cambio: tipo de cambio
+  expectedReturnPercent?: number; // para Plazo fijo
   actualReturnPercent?: number;
   notes: string;
 };

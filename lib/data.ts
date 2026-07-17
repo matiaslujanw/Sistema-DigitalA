@@ -1,9 +1,9 @@
 import "server-only";
 
 import { unstable_noStore as noStore } from "next/cache";
-import { cashMovements as mockCashMovements, clients as mockClients, costs as mockCosts, events as mockEvents, partnerProfiles as mockPartnerProfiles, projectPayments as mockProjectPayments, projects as mockProjects } from "@/lib/mock-data";
+import { cashMovements as mockCashMovements, clients as mockClients, costs as mockCosts, events as mockEvents, maintenanceContracts as mockMaintenanceContracts, partnerProfiles as mockPartnerProfiles, projectPayments as mockProjectPayments, projects as mockProjects } from "@/lib/mock-data";
 import { createSupabaseServerClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import type { CashMovement, Client, Cost, Idea, PartnerProfile, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
+import type { CashMovement, Client, Cost, Idea, MaintenanceContract, PartnerProfile, Project, ProjectEvent, ProjectNote, ProjectPayment } from "@/lib/types";
 
 type AppData = {
   cashMovements: CashMovement[];
@@ -11,6 +11,7 @@ type AppData = {
   costs: Cost[];
   events: ProjectEvent[];
   ideas: Idea[];
+  maintenanceContracts: MaintenanceContract[];
   notes: ProjectNote[];
   partnerProfiles: PartnerProfile[];
   payments: ProjectPayment[];
@@ -103,6 +104,21 @@ type DbCost = {
   currency: "ARS" | "USD";
   cadence: "Mensual" | "Unico";
   category: Cost["category"];
+  due_day: number | null;
+  last_paid_month: string | null;
+};
+
+type DbMaintenanceContract = {
+  id: string;
+  project_id: string;
+  system_name: string;
+  client_name: string | null;
+  amount: number | string;
+  currency: "ARS" | "USD";
+  due_day: number | null;
+  last_paid_month: string | null;
+  active: boolean | null;
+  notes: string | null;
 };
 
 type DbIdea = {
@@ -118,13 +134,16 @@ type DbIdea = {
 
 type DbCashMovement = {
   id: string;
+  payment_id: string | null;
+  parent_movement_id: string | null;
+  partner_id: string | null;
   source_project_id: string | null;
   happened_on: string;
+  due_date: string | null;
   concept: string;
   amount: number | string;
   currency: "ARS" | "USD";
-  destination: CashMovement["destination"];
-  operation: CashMovement["operation"];
+  operation: CashMovement["kind"] | null;
   acquired_currency: CashMovement["acquiredCurrency"] | null;
   acquired_amount: number | string | null;
   exchange_rate: number | string | null;
@@ -139,6 +158,7 @@ const fallbackData: AppData = {
   costs: mockCosts,
   events: mockEvents,
   ideas: [],
+  maintenanceContracts: mockMaintenanceContracts,
   notes: [],
   partnerProfiles: mockPartnerProfiles,
   payments: mockProjectPayments,
@@ -190,7 +210,8 @@ async function getSupabaseData(): Promise<AppData> {
     notesResult,
     costsResult,
     cashMovementsResult,
-    ideasResult
+    ideasResult,
+    maintenanceContractsResult
   ] = await Promise.all([
     supabase.from("clients").select("*").order("created_at", { ascending: true }),
     supabase.from("partners").select("*").order("created_at", { ascending: true }),
@@ -201,7 +222,8 @@ async function getSupabaseData(): Promise<AppData> {
     supabase.from("project_notes").select("*").order("happened_on", { ascending: false }),
     supabase.from("costs").select("*").order("created_at", { ascending: false }),
     supabase.from("cash_movements").select("*").order("happened_on", { ascending: false }),
-    supabase.from("ideas").select("*").order("created_at", { ascending: false })
+    supabase.from("ideas").select("*").order("created_at", { ascending: false }),
+    supabase.from("maintenance_contracts").select("*").order("created_at", { ascending: false })
   ]);
 
   const results = [
@@ -231,6 +253,8 @@ async function getSupabaseData(): Promise<AppData> {
   const dbCashMovements = (cashMovementsResult.data ?? []) as DbCashMovement[];
   // La tabla ideas puede no existir todavia (SQL pendiente de aplicar); no bloquea el resto.
   const dbIdeas = (ideasResult.error ? [] : (ideasResult.data ?? [])) as DbIdea[];
+  // Idem mantenimientos: si la tabla todavia no fue aplicada, el resto del sistema sigue levantando.
+  const dbMaintenanceContracts = (maintenanceContractsResult.error ? [] : (maintenanceContractsResult.data ?? [])) as DbMaintenanceContract[];
   const partnerNameById = new Map(dbPartners.map((partner) => [partner.id, partner.name]));
 
   const clients = dbClients.map<Client>((client) => ({
@@ -286,19 +310,22 @@ async function getSupabaseData(): Promise<AppData> {
   return {
     cashMovements: dbCashMovements.map<CashMovement>((movement) => ({
       id: movement.id,
+      paymentId: movement.payment_id,
+      parentMovementId: movement.parent_movement_id,
+      partnerId: movement.partner_id,
+      sourceProjectId: movement.source_project_id,
+      kind: (movement.operation ?? "Gasto") as CashMovement["kind"],
+      date: movement.happened_on,
+      dueDate: movement.due_date,
+      concept: movement.concept,
+      amount: toNumber(movement.amount),
+      currency: movement.currency,
       acquiredAmount: toOptionalNumber(movement.acquired_amount),
       acquiredCurrency: movement.acquired_currency ?? undefined,
-      actualReturnPercent: toOptionalNumber(movement.actual_return_percent),
-      amount: toNumber(movement.amount),
-      concept: movement.concept,
-      currency: movement.currency,
-      date: movement.happened_on,
-      destination: movement.destination,
       exchangeRate: toOptionalNumber(movement.exchange_rate),
       expectedReturnPercent: toOptionalNumber(movement.expected_return_percent),
-      notes: movement.notes ?? "",
-      operation: movement.operation,
-      sourceProjectId: movement.source_project_id
+      actualReturnPercent: toOptionalNumber(movement.actual_return_percent),
+      notes: movement.notes ?? ""
     })),
     clients,
     costs: dbCosts.map<Cost>((cost) => ({
@@ -307,6 +334,8 @@ async function getSupabaseData(): Promise<AppData> {
       cadence: cost.cadence,
       category: cost.category,
       currency: cost.currency,
+      dueDay: cost.due_day,
+      lastPaidMonth: cost.last_paid_month,
       name: cost.name,
       projectId: cost.project_id,
       provider: cost.provider ?? "Sin proveedor"
@@ -330,6 +359,18 @@ async function getSupabaseData(): Promise<AppData> {
       projectId: idea.project_id,
       title: idea.title,
       urgency: idea.urgency
+    })),
+    maintenanceContracts: dbMaintenanceContracts.map<MaintenanceContract>((maintenance) => ({
+      id: maintenance.id,
+      active: maintenance.active ?? true,
+      amount: toNumber(maintenance.amount),
+      clientName: maintenance.client_name ?? "Cliente",
+      currency: maintenance.currency,
+      dueDay: maintenance.due_day ?? 10,
+      lastPaidMonth: maintenance.last_paid_month,
+      notes: maintenance.notes ?? "",
+      projectId: maintenance.project_id,
+      systemName: maintenance.system_name
     })),
     notes: dbNotes.map<ProjectNote>((note) => ({
       id: note.id,

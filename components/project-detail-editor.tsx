@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { addProjectEventAction, addProjectNoteAction, addProjectPaymentAction, deleteProjectAction, deleteProjectEventAction, deleteProjectNoteAction, deleteProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
 import type { Client, Cost, Idea, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
 import { projectStatuses } from "@/lib/project-statuses";
@@ -18,6 +18,7 @@ type EditableProject = Project & {
 const paymentMethods: PaymentMethod[] = ["Transferencia", "Efectivo", "USD", "Cheque", "Mixto"];
 const noteTypes: ProjectNote["type"][] = ["Reunion", "Relevamiento", "Decision", "Pedido cliente", "Nota interna", "Bloqueo", "Alcance", "Cambio de alcance"];
 const eventTypes: ProjectEvent["type"][] = ["Reunion", "Entrega", "Feature", "Implementacion", "Decision", "Relevamiento", "Nota", "Pedido cliente", "Bloqueo", "Cambio de alcance"];
+type DetailSection = "resumen" | "cobros" | "actividad" | "notas";
 
 export function ProjectDetailEditor({
   client,
@@ -41,9 +42,12 @@ export function ProjectDetailEditor({
   source: "mock" | "supabase";
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const actionIntent = searchParams.get("accion");
   const [isPending, startTransition] = useTransition();
   const [project, setProject] = useState<EditableProject>({ ...initialProject, notes: initialNotes, payments: initialPayments });
   const [events, setEvents] = useState<ProjectEvent[]>(initialEvents);
+  const [activeSection, setActiveSection] = useState<DetailSection>("resumen");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState(
     source === "supabase"
@@ -100,6 +104,23 @@ export function ProjectDetailEditor({
   }, 0);
   const profit = paidAmount - projectCosts;
   const realMargin = paidAmount > 0 ? Math.round((profit / paidAmount) * 100) : null;
+  const sectionClass = (section: DetailSection, className: string) => `${className} project-section section-${section} ${activeSection === section ? "active" : "is-hidden"}`;
+
+  useEffect(() => {
+    if (actionIntent === "pago") {
+      setActiveSection("cobros");
+      return;
+    }
+    if (actionIntent === "reunion") {
+      setActiveSection("actividad");
+      setEventDraft((current) => ({ ...current, type: "Reunion" }));
+      return;
+    }
+    if (actionIntent === "nota") {
+      setActiveSection("notas");
+      return;
+    }
+  }, [actionIntent]);
 
   function updateProject<T extends keyof EditableProject>(key: T, value: EditableProject[T]) {
     setProject((current) => ({ ...current, [key]: value }));
@@ -387,6 +408,11 @@ export function ProjectDetailEditor({
             <span>{elapsedDays} dias trazados</span>
             {project.dueDate ? <DueBadge dueDate={project.dueDate} status={project.status} /> : <span className="muted-text">Entrega sin definir — cargala abajo</span>}
           </div>
+          <div className="detail-quick-actions" aria-label="Acciones rapidas del proyecto">
+            <button type="button" onClick={() => setActiveSection("cobros")}>Cargar pago</button>
+            <button type="button" onClick={() => { setActiveSection("actividad"); setEventDraft((current) => ({ ...current, type: "Reunion" })); }}>Registrar reunión</button>
+            <button type="button" onClick={() => setActiveSection("notas")}>Agregar nota</button>
+          </div>
         </div>
         <div className="detail-hero-actions">
           <button className="primary-button" disabled={isPending || readOnly} title={readOnlyReason} type="button" onClick={saveProjectChanges}>
@@ -443,8 +469,27 @@ export function ProjectDetailEditor({
 
       <p className="detail-feedback">{feedback}</p>
 
+      <section className="project-touchbar" aria-label="Resumen del proyecto">
+        <button className={activeSection === "resumen" ? "active" : ""} type="button" onClick={() => setActiveSection("resumen")}>
+          <span>Resumen</span>
+          <strong>{project.status}</strong>
+        </button>
+        <button className={activeSection === "cobros" ? "active" : ""} type="button" onClick={() => setActiveSection("cobros")}>
+          <span>Cobros</span>
+          <strong>{money(balance, project.currency)} pendiente</strong>
+        </button>
+        <button className={activeSection === "actividad" ? "active" : ""} type="button" onClick={() => setActiveSection("actividad")}>
+          <span>Actividad</span>
+          <strong>{events.length} movimientos</strong>
+        </button>
+        <button className={activeSection === "notas" ? "active" : ""} type="button" onClick={() => setActiveSection("notas")}>
+          <span>Notas</span>
+          <strong>{project.notes.length} relevamientos</strong>
+        </button>
+      </section>
+
       <section className="detail-grid">
-        <article className="panel-block edit-panel">
+        <article className={sectionClass("resumen", "panel-block edit-panel")}>
           <div className="block-heading">
             <span className="eyebrow">Ficha del producto</span>
             <span>{project.kind}</span>
@@ -513,7 +558,7 @@ export function ProjectDetailEditor({
           </label>
         </article>
 
-        <article className="panel-block edit-panel">
+        <article className={sectionClass("resumen", "panel-block edit-panel")}>
           <div className="block-heading">
             <span className="eyebrow">Estado y contrato</span>
             <span>{source === "supabase" ? "Editable Supabase" : "Mock"}</span>
@@ -585,7 +630,7 @@ export function ProjectDetailEditor({
           </div>
         </article>
 
-        <article className="panel-block finance-summary-card">
+        <article className={sectionClass("resumen", "panel-block finance-summary-card")}>
           <span className="eyebrow">Cobranza</span>
           <strong>{money(paidAmount, project.currency)}</strong>
           <small>cobrado de {money(project.salePrice, project.currency)}</small>
@@ -629,7 +674,7 @@ export function ProjectDetailEditor({
           </div>
         </article>
 
-        <article className="panel-block payment-panel">
+        <article className={sectionClass("cobros", "panel-block payment-panel")}>
           <div className="block-heading">
             <span className="eyebrow">Pagos por fecha</span>
             <span>{project.payments.length} registros</span>
@@ -699,7 +744,7 @@ export function ProjectDetailEditor({
           </div>
         </article>
 
-        <article className="panel-block trace-board detail-trace">
+        <article className={sectionClass("actividad", "panel-block trace-board detail-trace")}>
           <div className="block-heading">
             <span className="eyebrow">Reuniones y actividad</span>
             <span>{sortedEvents.length} en la trazabilidad</span>
@@ -769,7 +814,7 @@ export function ProjectDetailEditor({
         </article>
 
         {ideas.length > 0 ? (
-          <article className="panel-block linked-ideas-panel">
+          <article className={sectionClass("actividad", "panel-block linked-ideas-panel")}>
             <div className="block-heading">
               <span className="eyebrow">Ideas vinculadas</span>
               <span>{ideas.length} {ideas.length === 1 ? "idea" : "ideas"} · <Link className="inline-link" href="/ideas">Ver tablero</Link></span>
@@ -787,7 +832,7 @@ export function ProjectDetailEditor({
           </article>
         ) : null}
 
-        <article className="panel-block notes-panel">
+        <article className={sectionClass("notas", "panel-block notes-panel")}>
           <div className="block-heading">
             <span className="eyebrow">Notas / Relevamientos</span>
             <span>{project.notes.length} notas</span>
