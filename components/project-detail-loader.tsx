@@ -27,7 +27,7 @@ export function ProjectDetailLoader({
   projectId: string;
   source: "mock" | "supabase";
 }) {
-  if (!initialProject || !initialClient) {
+  if (!initialProject) {
     return (
       <section className="panel-block missing-project">
         <span className="eyebrow">Proyecto no encontrado</span>

@@ -3,9 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addProjectNoteAction, addProjectPaymentAction, deleteProjectAction, deleteProjectNoteAction, deleteProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
+import { addProjectEventAction, addProjectNoteAction, addProjectPaymentAction, deleteProjectAction, deleteProjectEventAction, deleteProjectNoteAction, deleteProjectPaymentAction, updateProjectAction } from "@/app/actions/projects";
 import type { Client, Cost, Idea, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectPayment, ProjectStatus } from "@/lib/types";
 import { projectStatuses } from "@/lib/project-statuses";
+import { projectVerticals } from "@/lib/verticals";
 import { dateLabel, daysBetween, money } from "@/lib/format";
 import { StatusPill } from "./ui";
 
@@ -16,11 +17,12 @@ type EditableProject = Project & {
 
 const paymentMethods: PaymentMethod[] = ["Transferencia", "Efectivo", "USD", "Cheque", "Mixto"];
 const noteTypes: ProjectNote["type"][] = ["Reunion", "Relevamiento", "Decision", "Pedido cliente", "Nota interna", "Bloqueo", "Alcance", "Cambio de alcance"];
+const eventTypes: ProjectEvent["type"][] = ["Reunion", "Entrega", "Feature", "Implementacion", "Decision", "Relevamiento", "Nota", "Pedido cliente", "Bloqueo", "Cambio de alcance"];
 
 export function ProjectDetailEditor({
   client,
   costs,
-  events,
+  events: initialEvents,
   ideas,
   initialNotes,
   initialProject,
@@ -28,7 +30,7 @@ export function ProjectDetailEditor({
   partnerNames,
   source
 }: {
-  client: Client;
+  client: Client | null;
   costs: Cost[];
   events: ProjectEvent[];
   ideas: Idea[];
@@ -41,6 +43,7 @@ export function ProjectDetailEditor({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [project, setProject] = useState<EditableProject>({ ...initialProject, notes: initialNotes, payments: initialPayments });
+  const [events, setEvents] = useState<ProjectEvent[]>(initialEvents);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState(
     source === "supabase"
@@ -67,6 +70,14 @@ export function ProjectDetailEditor({
     owner: partnerNames[0] ?? "",
     title: "",
     type: "Relevamiento" as ProjectNote["type"]
+  });
+  const [eventDraft, setEventDraft] = useState({
+    date: today,
+    hours: "1",
+    notes: "",
+    owner: partnerNames[0] ?? "",
+    title: "",
+    type: "Reunion" as ProjectEvent["type"]
   });
 
   const paidAmount = useMemo(
@@ -103,11 +114,16 @@ export function ProjectDetailEditor({
           contractDate: project.contractDate,
           contractSigned: project.contractSigned,
           currency: project.currency,
+          deployUrl: project.deployUrl,
           dueDate: project.dueDate,
+          generatesRevenue: project.generatesRevenue,
+          kind: project.kind,
           nextMilestone: project.nextMilestone,
           paymentMethod: project.paymentMethod,
           salePrice: project.salePrice,
-          status: project.status
+          status: project.status,
+          summary: project.summary,
+          vertical: project.vertical
         });
         setFeedback("Cambios guardados en Supabase");
         router.refresh();
@@ -130,7 +146,7 @@ export function ProjectDetailEditor({
         router.push("/proyectos");
         router.refresh();
         if (result.removedClient) {
-          setFeedback(`Proyecto y cliente ${client.name} eliminados`);
+          setFeedback(`Proyecto y cliente ${client?.name ?? ""} eliminados`);
         }
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "No se pudo borrar el proyecto");
@@ -220,6 +236,78 @@ export function ProjectDetailEditor({
     });
   }
 
+  function addEvent() {
+    if (!eventDraft.title.trim()) return;
+
+    const event: ProjectEvent = {
+      id: `local-event-${Date.now()}`,
+      projectId: project.id,
+      type: eventDraft.type,
+      title: eventDraft.title.trim(),
+      date: eventDraft.date,
+      hours: Number(eventDraft.hours) || 0,
+      owner: eventDraft.owner.trim() || "Sin responsable",
+      notes: eventDraft.notes.trim()
+    };
+
+    const resetEventDraft = () => setEventDraft((current) => ({ ...current, hours: "1", notes: "", title: "" }));
+
+    if (source !== "supabase") {
+      setEvents((current) => [event, ...current]);
+      resetEventDraft();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const newId = await addProjectEventAction({
+          date: event.date,
+          hours: event.hours,
+          notes: event.notes,
+          owner: event.owner,
+          projectId: project.id,
+          title: event.title,
+          type: event.type
+        });
+        setEvents((current) => [{ ...event, id: newId }, ...current]);
+        resetEventDraft();
+        setFeedback(`${event.type} registrada en Supabase`);
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo guardar la actividad");
+      }
+    });
+  }
+
+  function deleteEvent(event: ProjectEvent) {
+    const confirmId = `event-${event.id}`;
+    if (confirmingDeleteId !== confirmId) {
+      setConfirmingDeleteId(confirmId);
+      return;
+    }
+
+    const removeLocally = () => {
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+      setConfirmingDeleteId(null);
+    };
+
+    if (source !== "supabase") {
+      removeLocally();
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteProjectEventAction(event.id);
+        removeLocally();
+        setFeedback("Actividad eliminada");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "No se pudo borrar la actividad");
+      }
+    });
+  }
+
   function deletePayment(payment: ProjectPayment) {
     const confirmId = `payment-${payment.id}`;
     if (confirmingDeleteId !== confirmId) {
@@ -284,7 +372,13 @@ export function ProjectDetailEditor({
         <div>
           <Link href="/proyectos" className="back-link">← Proyectos</Link>
           <span className="eyebrow">
-            <Link className="inline-link" href={`/clientes/${client.id}`}>{client.name}</Link> · {client.industry}
+            {client ? (
+              <>
+                <Link className="inline-link" href={`/clientes/${client.id}`}>{client.name}</Link> · {client.industry}
+              </>
+            ) : (
+              <>Producto propio{project.vertical ? ` · ${project.vertical}` : ""}</>
+            )}
           </span>
           <h1>{project.name}</h1>
           <div className="detail-meta">
@@ -350,6 +444,75 @@ export function ProjectDetailEditor({
       <p className="detail-feedback">{feedback}</p>
 
       <section className="detail-grid">
+        <article className="panel-block edit-panel">
+          <div className="block-heading">
+            <span className="eyebrow">Ficha del producto</span>
+            <span>{project.kind}</span>
+          </div>
+
+          <div className="kind-switch" role="group" aria-label="Tipo de proyecto">
+            <button
+              type="button"
+              className={project.kind === "Propio" ? "active" : ""}
+              aria-pressed={project.kind === "Propio"}
+              onClick={() => updateProject("kind", "Propio")}
+            >
+              Producto propio
+            </button>
+            <button
+              type="button"
+              className={project.kind === "Cliente" ? "active" : ""}
+              aria-pressed={project.kind === "Cliente"}
+              onClick={() => updateProject("kind", "Cliente")}
+            >
+              De un cliente
+            </button>
+          </div>
+
+          <label className="field">
+            <span>Amenity / vertical</span>
+            <input
+              list="detail-verticals"
+              placeholder="Hoteles, Financieras, Countries…"
+              value={project.vertical ?? ""}
+              onChange={(event) => updateProject("vertical", event.target.value || null)}
+            />
+            <datalist id="detail-verticals">
+              {projectVerticals.map((vertical) => <option key={vertical} value={vertical} />)}
+            </datalist>
+          </label>
+
+          <label className="field">
+            <span>De qué es</span>
+            <textarea
+              placeholder="Qué resuelve, para quién."
+              value={project.summary ?? ""}
+              onChange={(event) => updateProject("summary", event.target.value || null)}
+            />
+          </label>
+
+          <label className="field">
+            <span>Dónde está deployado</span>
+            <input
+              placeholder="https://…"
+              value={project.deployUrl ?? ""}
+              onChange={(event) => updateProject("deployUrl", event.target.value || null)}
+            />
+            {project.deployUrl ? (
+              <a className="inline-link" href={project.deployUrl} target="_blank" rel="noreferrer">Abrir deploy ↗</a>
+            ) : null}
+          </label>
+
+          <label className="field checkbox-field">
+            <input
+              checked={project.generatesRevenue}
+              type="checkbox"
+              onChange={(event) => updateProject("generatesRevenue", event.target.checked)}
+            />
+            <span>Ya genera ingresos</span>
+          </label>
+        </article>
+
         <article className="panel-block edit-panel">
           <div className="block-heading">
             <span className="eyebrow">Estado y contrato</span>
@@ -538,9 +701,49 @@ export function ProjectDetailEditor({
 
         <article className="panel-block trace-board detail-trace">
           <div className="block-heading">
-            <span className="eyebrow">Trazabilidad</span>
-            <span>{sortedEvents.length} eventos · <Link className="inline-link" href="/novedades/nueva">Cargar novedad</Link></span>
+            <span className="eyebrow">Reuniones y actividad</span>
+            <span>{sortedEvents.length} en la trazabilidad</span>
           </div>
+
+          <div className="note-form">
+            <div className="field-grid">
+              <label className="field">
+                <span>Tipo</span>
+                <select value={eventDraft.type} onChange={(event) => setEventDraft((current) => ({ ...current, type: event.target.value as ProjectEvent["type"] }))}>
+                  {eventTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span>Fecha</span>
+                <input type="date" value={eventDraft.date} onChange={(event) => setEventDraft((current) => ({ ...current, date: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Horas</span>
+                <input min="0" step="0.5" type="number" value={eventDraft.hours} onChange={(event) => setEventDraft((current) => ({ ...current, hours: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Responsable</span>
+                <input
+                  list="detail-event-partners"
+                  value={eventDraft.owner}
+                  onChange={(event) => setEventDraft((current) => ({ ...current, owner: event.target.value }))}
+                />
+                <datalist id="detail-event-partners">
+                  {partnerNames.map((name) => <option key={name} value={name} />)}
+                </datalist>
+              </label>
+            </div>
+            <label className="field">
+              <span>Titulo</span>
+              <input placeholder="Ej: reunion de kickoff, entrega del modulo de stock" value={eventDraft.title} onChange={(event) => setEventDraft((current) => ({ ...current, title: event.target.value }))} />
+            </label>
+            <label className="field">
+              <span>Detalle / minuta</span>
+              <textarea value={eventDraft.notes} onChange={(event) => setEventDraft((current) => ({ ...current, notes: event.target.value }))} />
+            </label>
+            <button className="command-button note-submit" disabled={isPending} type="button" onClick={addEvent}>Registrar actividad</button>
+          </div>
+
           <div className="event-stack">
             {sortedEvents.map((event) => (
               <article className="event-line expanded" key={event.id}>
@@ -548,12 +751,18 @@ export function ProjectDetailEditor({
                 <strong>{event.title}</strong>
                 <p>{event.notes}</p>
                 <small>{event.owner} · {event.hours} h</small>
+                <div className="row-actions">
+                  <button className={confirmingDeleteId === `event-${event.id}` ? "danger-confirm" : ""} disabled={isPending} type="button" onClick={() => deleteEvent(event)}>
+                    {confirmingDeleteId === `event-${event.id}` ? "Confirmar" : "Borrar"}
+                  </button>
+                  {confirmingDeleteId === `event-${event.id}` ? <button type="button" onClick={() => setConfirmingDeleteId(null)}>Cancelar</button> : null}
+                </div>
               </article>
             ))}
             {sortedEvents.length === 0 ? (
               <div className="panel-empty">
-                <strong>Sin eventos todavia.</strong>
-                <Link href="/novedades/nueva">Cargar la primera novedad</Link>
+                <strong>Sin reuniones ni actividad todavia.</strong>
+                <span>Registra la primera con el formulario de arriba.</span>
               </div>
             ) : null}
           </div>

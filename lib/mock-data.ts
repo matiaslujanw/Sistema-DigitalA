@@ -35,15 +35,19 @@ export const partnerProfiles: PartnerProfile[] = [
 export const clients: Client[] = [
   { id: "c1", name: "Malala", contact: "Camila Ruiz", industry: "Salon de belleza" },
   { id: "c2", name: "La Vieja Escuela", contact: "Martin Paz", industry: "Bar cafe" },
-  { id: "c3", name: "Bonivibe", contact: "Florencia Vega", industry: "Marca de ropa" },
-  { id: "c4", name: "Countrify", contact: "Equipo interno", industry: "Producto propio" }
+  { id: "c3", name: "Bonivibe", contact: "Florencia Vega", industry: "Marca de ropa" }
 ];
 
 export const projects: Project[] = [
   {
     id: "p1",
     name: "Sistema integral Malala",
+    kind: "Cliente",
     clientId: "c1",
+    vertical: null,
+    summary: null,
+    deployUrl: null,
+    generatesRevenue: true,
     status: "En desarrollo",
     salePrice: 1850000,
     currency: "ARS",
@@ -60,7 +64,12 @@ export const projects: Project[] = [
   {
     id: "p2",
     name: "IA operativa La Vieja Escuela",
+    kind: "Cliente",
     clientId: "c2",
+    vertical: null,
+    summary: null,
+    deployUrl: null,
+    generatesRevenue: true,
     status: "Implementacion",
     salePrice: 1200000,
     currency: "ARS",
@@ -77,7 +86,12 @@ export const projects: Project[] = [
   {
     id: "p3",
     name: "Tienda sincronizada Bonivibe",
+    kind: "Cliente",
     clientId: "c3",
+    vertical: null,
+    summary: null,
+    deployUrl: null,
+    generatesRevenue: true,
     status: "En uso",
     salePrice: 2400,
     currency: "USD",
@@ -93,8 +107,13 @@ export const projects: Project[] = [
   },
   {
     id: "p4",
-    name: "Backoffice Countrify",
-    clientId: "c4",
+    name: "Countrify",
+    kind: "Propio",
+    clientId: null,
+    vertical: "Countries / Barrios",
+    summary: "Plataforma de gestion para countries y barrios privados: accesos, expensas y avisos.",
+    deployUrl: "https://countrify.app",
+    generatesRevenue: false,
     status: "Relevamiento",
     salePrice: 0,
     currency: "ARS",

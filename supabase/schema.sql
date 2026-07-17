@@ -148,6 +148,21 @@ alter table public.ideas add column if not exists project_id uuid references pub
 -- Fecha comprometida de entrega/fin del proyecto (definida por los socios).
 alter table public.projects add column if not exists due_date date;
 
+-- Proyectos propios (productos de Digital Amenities) vs. de clientes.
+alter table public.projects add column if not exists kind text not null default 'Cliente' check (kind in ('Propio', 'Cliente'));
+-- Amenity / vertical del producto (Hoteles, Financieras, Countries...). Texto libre: se crean nuevas a mano.
+alter table public.projects add column if not exists vertical text;
+-- De que es el producto (descripcion corta).
+alter table public.projects add column if not exists summary text;
+-- Donde esta deployado (URL publica).
+alter table public.projects add column if not exists deploy_url text;
+-- Si el producto ya genera ingresos.
+alter table public.projects add column if not exists generates_revenue boolean not null default false;
+-- Los proyectos propios no tienen cliente: client_id deja de ser obligatorio.
+alter table public.projects alter column client_id drop not null;
+create index if not exists projects_kind_idx on public.projects(kind);
+create index if not exists projects_vertical_idx on public.projects(vertical);
+
 create index if not exists ideas_project_id_idx on public.ideas(project_id);
 create index if not exists projects_client_id_idx on public.projects(client_id);
 create index if not exists project_payments_project_id_idx on public.project_payments(project_id);

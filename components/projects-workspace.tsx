@@ -21,7 +21,13 @@ export function ProjectsWorkspace({
 }) {
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [partnerFilter, setPartnerFilter] = useState("Todos");
+  const [kindFilter, setKindFilter] = useState("Todos");
+  const [verticalFilter, setVerticalFilter] = useState("Todos");
   const partners = useMemo(() => Array.from(new Set(projects.flatMap((project) => project.partners))).sort(), [projects]);
+  const verticals = useMemo(
+    () => Array.from(new Set(projects.map((project) => project.vertical).filter((vertical): vertical is string => Boolean(vertical)))).sort(),
+    [projects]
+  );
   const enrichedProjects = useMemo(() => {
     return projects.map((project) => {
       const client = clients.find((item) => item.id === project.clientId);
@@ -47,13 +53,20 @@ export function ProjectsWorkspace({
   const filteredProjects = enrichedProjects.filter(({ project }) => {
     const matchesStatus = statusFilter === "Todos" || project.status === statusFilter;
     const matchesPartner = partnerFilter === "Todos" || project.partners.includes(partnerFilter);
-    return matchesStatus && matchesPartner;
+    const matchesKind = kindFilter === "Todos" || project.kind === kindFilter;
+    const matchesVertical = verticalFilter === "Todos" || project.vertical === verticalFilter;
+    return matchesStatus && matchesPartner && matchesKind && matchesVertical;
   });
   const activeProjects = projects.filter((project) => project.status !== "En uso");
-  const arsSold = projects.filter((project) => project.currency === "ARS").reduce((sum, project) => sum + project.salePrice, 0);
-  const usdSold = projects.filter((project) => project.currency === "USD").reduce((sum, project) => sum + project.salePrice, 0);
-  const totalPending = enrichedProjects.reduce((sum, item) => sum + item.pendingAmount, 0);
-  const avgMargin = activeProjects.length > 0 ? Math.round(activeProjects.reduce((sum, project) => sum + project.marginTarget, 0) / activeProjects.length) : 0;
+  // Los montos de cartera/cobranza son solo de proyectos de cliente: un producto
+  // propio no tiene "precio de venta" y distorsionaria estos numeros.
+  const clientProjects = projects.filter((project) => project.kind === "Cliente");
+  const ownProjects = projects.filter((project) => project.kind === "Propio");
+  const activeClientProjects = clientProjects.filter((project) => project.status !== "En uso");
+  const arsSold = clientProjects.filter((project) => project.currency === "ARS").reduce((sum, project) => sum + project.salePrice, 0);
+  const usdSold = clientProjects.filter((project) => project.currency === "USD").reduce((sum, project) => sum + project.salePrice, 0);
+  const totalPending = enrichedProjects.filter((item) => item.project.kind === "Cliente").reduce((sum, item) => sum + item.pendingAmount, 0);
+  const avgMargin = activeClientProjects.length > 0 ? Math.round(activeClientProjects.reduce((sum, project) => sum + project.marginTarget, 0) / activeClientProjects.length) : 0;
   const riskProjects = projects.filter((project) => project.status === "Correcciones" || project.status === "Relevamiento").length;
   const trackedHours = events.reduce((sum, event) => sum + event.hours, 0);
   // Entregas: solo cuentan los proyectos que siguen abiertos. Uno "En uso" ya se entrego.
@@ -69,6 +82,23 @@ export function ProjectsWorkspace({
           <p>Visualizacion de rendimiento, cobranza y riesgos operativos.</p>
         </div>
         <div className="command-filters">
+          <label>
+            <span>Tipo</span>
+            <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
+              <option value="Todos">Todos</option>
+              <option value="Propio">Propios</option>
+              <option value="Cliente">De clientes</option>
+            </select>
+          </label>
+          <label>
+            <span>Amenity</span>
+            <select value={verticalFilter} onChange={(event) => setVerticalFilter(event.target.value)}>
+              <option value="Todos">Todas</option>
+              {verticals.map((vertical) => (
+                <option value={vertical} key={vertical}>{vertical}</option>
+              ))}
+            </select>
+          </label>
           <label>
             <span>Estado</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -96,15 +126,15 @@ export function ProjectsWorkspace({
       </header>
 
       <section className="project-command-kpis">
-        <KpiCard label="Cartera total" value={`${money(arsSold)}${usdSold > 0 ? ` / ${money(usdSold, "USD")}` : ""}`} tone="green" />
+        <KpiCard label="Cartera clientes" value={`${money(arsSold)}${usdSold > 0 ? ` / ${money(usdSold, "USD")}` : ""}`} tone="green" />
         <KpiCard label="Cobros pendientes" value={money(totalPending)} tone="blue" />
-        <KpiCard label="Margen promedio" value={`${avgMargin}%`} tone="blue" />
+        <KpiCard label="Productos propios" value={`${ownProjects.length}`} tone="blue" />
         <KpiCard label="Riesgo detectado" value={`${riskProjects} Proyectos`} tone="red" />
       </section>
 
       <section className="project-ledger">
         <div className="project-ledger-head">
-          <span>Cliente / Proyecto</span>
+          <span>Proyecto / Amenity</span>
           <span>Estado</span>
           <span>Socio</span>
           <span>Progreso</span>
@@ -119,7 +149,15 @@ export function ProjectsWorkspace({
             <Link className="project-ledger-row" href={`/proyectos/${project.id}` as Route} key={project.id}>
               <div className={`project-name-cell stripe-${riskTone(project.status)}`}>
                 <strong>{project.name}</strong>
-                <span>{client?.name ?? "Cliente"} · {client?.industry ?? "Sin rubro"}</span>
+                <span>
+                  {project.kind === "Propio"
+                    ? `Producto propio${project.vertical ? ` · ${project.vertical}` : ""}`
+                    : `${client?.name ?? "Cliente"} · ${client?.industry ?? "Sin rubro"}`}
+                </span>
+                <span className="project-tag-row">
+                  <mark className={`kind-badge ${project.kind === "Propio" ? "own" : "client"}`}>{project.kind}</mark>
+                  {project.vertical ? <mark className="vertical-chip">{project.vertical}</mark> : null}
+                </span>
               </div>
               <div>
                 <mark className={`project-state ${riskTone(project.status)}`}>{project.status}</mark>

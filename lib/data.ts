@@ -37,7 +37,12 @@ type DbPartner = {
 
 type DbProject = {
   id: string;
-  client_id: string;
+  client_id: string | null;
+  kind: Project["kind"] | null;
+  vertical: string | null;
+  summary: string | null;
+  deploy_url: string | null;
+  generates_revenue: boolean | null;
   name: string;
   status: Project["status"];
   sale_price: number | string;
@@ -260,7 +265,10 @@ async function getSupabaseData(): Promise<AppData> {
       contractDate: project.contract_date,
       contractSigned: project.contract_signed,
       currency: project.currency,
+      deployUrl: project.deploy_url,
       dueDate: project.due_date,
+      generatesRevenue: project.generates_revenue ?? false,
+      kind: project.kind ?? "Cliente",
       marginTarget: toNumber(project.margin_target),
       name: project.name,
       nextMilestone: project.next_milestone ?? "Definir proximo hito",
@@ -269,7 +277,9 @@ async function getSupabaseData(): Promise<AppData> {
       paymentMethod: project.payment_method,
       salePrice: toNumber(project.sale_price),
       startDate: project.start_date,
-      status: project.status
+      status: project.status,
+      summary: project.summary,
+      vertical: project.vertical
     };
   });
 

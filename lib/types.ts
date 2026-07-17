@@ -7,6 +7,8 @@ export type ProjectStatus =
   | "Implementacion"
   | "En uso";
 
+export type ProjectKind = "Propio" | "Cliente";
+
 export type PaymentMethod = "Transferencia" | "Efectivo" | "USD" | "Cheque" | "Mixto";
 
 export type CashDestination = "Reparto socios" | "Plazo fijo" | "Dolares" | "Cheques" | "Reinversion" | "Caja";
@@ -65,7 +67,12 @@ export type ProjectPayment = {
 export type Project = {
   id: string;
   name: string;
-  clientId: string;
+  kind: ProjectKind;
+  clientId: string | null;
+  vertical: string | null;
+  summary: string | null;
+  deployUrl: string | null;
+  generatesRevenue: boolean;
   status: ProjectStatus;
   salePrice: number;
   currency: "ARS" | "USD";

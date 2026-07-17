@@ -3,13 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAuthServerClient, isSupabaseAuthConfigured, shouldRequireSupabaseAuth } from "@/lib/supabase/auth-server";
-import { partnerProfiles } from "@/lib/mock-data";
-import type { CashMovement, Cost, PaymentMethod, Project, ProjectEvent, ProjectNote, ProjectStatus } from "@/lib/types";
+import type { CashMovement, Cost, PaymentMethod, Project, ProjectEvent, ProjectKind, ProjectNote, ProjectStatus } from "@/lib/types";
 
 type CreateProjectInput = {
+  kind: ProjectKind;
   clientContact: string;
   clientIndustry: string;
   clientName: string;
+  vertical: string | null;
+  summary: string | null;
+  deployUrl: string | null;
+  generatesRevenue: boolean;
   contractSigned: boolean;
   currency: "ARS" | "USD";
   dueDate: string | null;
@@ -26,11 +30,16 @@ type UpdateProjectInput = {
   contractDate?: string | null;
   contractSigned?: boolean;
   currency?: "ARS" | "USD";
+  deployUrl?: string | null;
   dueDate?: string | null;
+  generatesRevenue?: boolean;
+  kind?: ProjectKind;
   nextMilestone?: string;
   paymentMethod?: PaymentMethod;
   salePrice?: number;
   status?: ProjectStatus;
+  summary?: string | null;
+  vertical?: string | null;
 };
 
 type AddPaymentInput = {
@@ -91,35 +100,46 @@ type AddCashMovementInput = {
 export async function createProjectAction(input: CreateProjectInput) {
   await requireAuthenticatedAction();
   const supabase = createSupabaseServerClient();
-  const partners = await ensureDefaultPartners();
+  const partners = await getExistingPartners();
 
-  const { data: client, error: clientError } = await supabase
-    .from("clients")
-    .insert({
-      contact: input.clientContact || "Sin contacto",
-      industry: input.clientIndustry || "Sin rubro",
-      name: input.clientName
-    })
-    .select("id")
-    .single();
+  // Los productos propios no tienen cliente: solo los proyectos de cliente
+  // crean (o reusan) una fila en clients.
+  let clientId: string | null = null;
+  if (input.kind === "Cliente") {
+    const { data: client, error: clientError } = await supabase
+      .from("clients")
+      .insert({
+        contact: input.clientContact || "Sin contacto",
+        industry: input.clientIndustry || "Sin rubro",
+        name: input.clientName
+      })
+      .select("id")
+      .single();
 
-  if (clientError) throw new Error(clientError.message);
+    if (clientError) throw new Error(clientError.message);
+    clientId = client.id;
+  }
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .insert({
-      client_id: client.id,
+      client_id: clientId,
       contract_date: input.contractSigned ? input.startDate : null,
       contract_signed: input.contractSigned,
       currency: input.currency,
+      deploy_url: input.deployUrl,
       due_date: input.dueDate,
+      generates_revenue: input.generatesRevenue,
+      kind: input.kind,
       margin_target: input.marginTarget,
       name: input.name,
       next_milestone: input.nextMilestone || "Definir proximo hito",
       payment_method: input.paymentMethod,
       sale_price: input.salePrice,
       start_date: input.startDate,
-      status: input.status
+      status: input.status,
+      summary: input.summary,
+      vertical: input.vertical
     })
     .select("id")
     .single();
@@ -150,11 +170,16 @@ export async function updateProjectAction(projectId: string, input: UpdateProjec
   if (input.contractDate !== undefined) payload.contract_date = input.contractDate;
   if (input.contractSigned !== undefined) payload.contract_signed = input.contractSigned;
   if (input.currency !== undefined) payload.currency = input.currency;
+  if (input.deployUrl !== undefined) payload.deploy_url = input.deployUrl;
   if (input.dueDate !== undefined) payload.due_date = input.dueDate;
+  if (input.generatesRevenue !== undefined) payload.generates_revenue = input.generatesRevenue;
+  if (input.kind !== undefined) payload.kind = input.kind;
   if (input.nextMilestone !== undefined) payload.next_milestone = input.nextMilestone;
   if (input.paymentMethod !== undefined) payload.payment_method = input.paymentMethod;
   if (input.salePrice !== undefined) payload.sale_price = input.salePrice;
   if (input.status !== undefined) payload.status = input.status;
+  if (input.summary !== undefined) payload.summary = input.summary;
+  if (input.vertical !== undefined) payload.vertical = input.vertical;
 
   const { error } = await supabase.from("projects").update(payload).eq("id", projectId);
   if (error) throw new Error(error.message);
@@ -183,18 +208,21 @@ export async function deleteProjectAction(projectId: string) {
   const { error } = await supabase.from("projects").delete().eq("id", projectId);
   if (error) throw new Error(error.message);
 
-  const { data: siblings, error: siblingsError } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("client_id", project.client_id)
-    .limit(1);
-  if (siblingsError) throw new Error(siblingsError.message);
-
+  // Un producto propio no tiene cliente: no hay nada que limpiar.
   let removedClient = false;
-  if (!siblings || siblings.length === 0) {
-    const { error: clientError } = await supabase.from("clients").delete().eq("id", project.client_id);
-    // El cliente huérfano no es fatal: el proyecto ya se borró y esa era la intención.
-    if (!clientError) removedClient = true;
+  if (project.client_id) {
+    const { data: siblings, error: siblingsError } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("client_id", project.client_id)
+      .limit(1);
+    if (siblingsError) throw new Error(siblingsError.message);
+
+    if (!siblings || siblings.length === 0) {
+      const { error: clientError } = await supabase.from("clients").delete().eq("id", project.client_id);
+      // El cliente huérfano no es fatal: el proyecto ya se borró y esa era la intención.
+      if (!clientError) removedClient = true;
+    }
   }
 
   revalidateProjectPaths(projectId);
@@ -433,27 +461,14 @@ async function requireAuthenticatedAction() {
   if (!user) throw new Error("No autorizado");
 }
 
-async function ensureDefaultPartners() {
+// Trae los socios existentes para adjuntarlos a un proyecto nuevo.
+// Antes sembraba 3 socios de ejemplo si no habia ninguno; se quito para que
+// arrancar de una base vacia no reviva nombres placeholder. Los socios se
+// crean solos cuando se asigna un responsable real (findOrCreatePartner).
+async function getExistingPartners() {
   const supabase = createSupabaseServerClient();
-  const { data: existing, error } = await supabase.from("partners").select("id,name");
+  const { data, error } = await supabase.from("partners").select("id,name");
   if (error) throw new Error(error.message);
-  if (existing && existing.length > 0) return existing as Array<{ id: string; name: string }>;
-
-  const { data, error: insertError } = await supabase
-    .from("partners")
-    .insert(
-      partnerProfiles.map((partner) => ({
-        allocation: partner.allocation,
-        email: partner.email,
-        focus: partner.focus,
-        name: partner.name,
-        role: partner.role,
-        status: partner.status
-      }))
-    )
-    .select("id,name");
-
-  if (insertError) throw new Error(insertError.message);
   return (data ?? []) as Array<{ id: string; name: string }>;
 }
 
@@ -491,6 +506,7 @@ async function syncProjectPaidAmount(projectId: string) {
 }
 
 function noteTypeToEventType(type: ProjectNote["type"]) {
+  if (type === "Reunion") return "Reunion";
   if (type === "Relevamiento") return "Relevamiento";
   if (type === "Decision") return "Decision";
   if (type === "Pedido cliente") return "Pedido cliente";
